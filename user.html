@@ -26,6 +26,10 @@
       <div class="locbox"><div class="pin">📍</div>
         <div class="txt"><b id="locName">위치 확인 중…</b><small id="locCoord">--</small></div>
         <button onclick="getLoc()">새로고침</button></div>
+      <div id="locPickWrap" class="hide">
+        <div class="muted" style="font-size:13px;margin-top:10px">위치를 자동으로 못 잡았어요. 아래 지도에서 <b>내 위치를 탭</b>해 주세요.</div>
+        <div id="locPick" style="width:100%;height:220px;border-radius:var(--rad);margin-top:10px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
+      </div>
       <div id="penaltyBanner"></div>
       <button class="cta" id="callBtn" onclick="startCall()" disabled>지금 호출하기</button>
       <div class="sec-divider"></div>
@@ -193,15 +197,27 @@ window.pickParty=p=>{sel.party=p;document.querySelectorAll('#partyChips .chip').
 window.pickCat=k=>{sel.cat=k;document.querySelectorAll('#catChips .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));chkReady();};
 function chkReady(){$('callBtn').disabled=!(sel.party&&sel.cat&&myLoc&&NW.cfgOk&&!penalActive());}
 
-window.getLoc=()=>{
-  $('locName').textContent='위치 확인 중…';
-  if(!navigator.geolocation){applyLoc(FALLBACK);return;}
-  navigator.geolocation.getCurrentPosition(
-    p=>applyLoc({lat:p.coords.latitude,lng:p.coords.longitude,name:'현재 위치'}),
-    ()=>{applyLoc(FALLBACK);toast('위치 권한이 없어 강남역 기준으로 설정했어요.');},
-    {enableHighAccuracy:true,timeout:8000});
+window.getLoc=async()=>{
+  $('locName').textContent='위치 확인 중…';$('locCoord').textContent='--';
+  try{
+    const l=await NW.getGPS();
+    $('locPickWrap').classList.add('hide');
+    applyLoc(l);
+  }catch(e){
+    $('locName').textContent='위치를 잡지 못했어요';
+    $('locCoord').textContent='지도에서 직접 선택';
+    showLocPicker();
+  }
 };
-function applyLoc(l){myLoc=l;$('locName').textContent=l.name;$('locCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);chkReady();}
+function applyLoc(l){myLoc=l;$('locName').textContent=l.name||'선택한 위치';$('locCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);chkReady();}
+let locPicker=null;
+async function showLocPicker(){
+  $('locPickWrap').classList.remove('hide');
+  if(locPicker) return;
+  locPicker=await NW.locationPicker('locPick', myLoc||NW.FALLBACK, (lat,lng)=>{
+    applyLoc({lat,lng,name:'지도에서 선택한 위치'});
+  });
+}
 
 let penaltyUntil=0;
 async function refreshPenalty(){
@@ -232,7 +248,32 @@ window.startCall=async()=>{
   curCallId=ref.id; subShow('u-search');
   $('resList').innerHTML=''; $('srCount').textContent='0';
   listenResponses(); runCallTimer(nowMs()+CALL_TTL*1000);
+  autoRespondDemo(ref.id);   // 데모 매장 자동 응답
 };
+
+/* 데모 매장(ownerId='demo') 자동 응답 — 반경·업종 맞으면 1~3초 뒤 '가능/10분후' 삽입.
+   실제 매장 콘솔이 없어도 혼자 전체 흐름을 테스트할 수 있게 해줌. */
+async function autoRespondDemo(callId){
+  try{
+    const {collection,query,where,getDocs,doc,setDoc,serverTimestamp}=NW.fb;
+    const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('cat','==',sel.cat)));
+    const demos=snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(b=>b.demo && b.approved!==false);
+    demos.forEach(b=>{
+      const dist=haversine(myLoc,{lat:b.lat,lng:b.lng});
+      if(dist>(b.radius||2000)) return;       // 반경 밖이면 응답 안 함
+      const type=Math.random()<0.75?'ok':'soon';
+      const delay=800+Math.random()*2500;     // 0.8~3.3초
+      setTimeout(async()=>{
+        // 호출이 아직 살아있을 때만
+        if(curCallId!==callId) return;
+        await setDoc(doc(NW.db,'nw_calls',callId,'responses',b.id),{
+          bizId:b.id, bizName:b.name, cat:b.cat, type, dist, at:serverTimestamp()
+        }).catch(()=>{});
+      }, delay);
+    });
+  }catch(e){ console.warn('autoRespondDemo',e); }
+}
 function listenResponses(){
   responses=[];
   const {collection,onSnapshot}=NW.fb;
@@ -439,6 +480,9 @@ async function renderPartner(){
     <div class="locbox"><div class="pin">📍</div>
       <div class="txt"><b id="pLocName">위치 확인 중…</b><small id="pLocCoord">--</small></div>
       <button onclick="pGetLoc()">새로고침</button></div>
+    <div id="pPickWrap" class="hide">
+      <div class="muted" style="font-size:13px;margin-top:8px">지도에서 <b>매장 위치를 탭</b>하세요.</div>
+      <div id="pPick" style="width:100%;height:200px;border-radius:var(--rad);margin-top:8px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div></div>
     <button class="cta" id="pBtn" onclick="submitPartner()" disabled>매장 파트너 신청하기</button>
     <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 되고, 관리자(NOWAIT 운영팀) 승인 후 매장 콘솔이 열려요.</div>`;
   $('pCat').innerHTML=NW.CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pPickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
@@ -448,10 +492,17 @@ async function renderPartner(){
 }
 window.pPickCat=k=>{pSel.cat=k;document.querySelectorAll('#pCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));pChk();};
 window.pPickRad=r=>{pSel.rad=r;document.querySelectorAll('#pRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
-window.pGetLoc=()=>{$('pLocName').textContent='위치 확인 중…';
-  if(!navigator.geolocation){pApplyLoc(FALLBACK);return;}
-  navigator.geolocation.getCurrentPosition(p=>pApplyLoc({lat:p.coords.latitude,lng:p.coords.longitude,name:'현재 위치'}),()=>pApplyLoc(FALLBACK),{timeout:8000});};
-function pApplyLoc(l){pLoc=l;$('pLocName').textContent=l.name;$('pLocCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);pChk();}
+window.pGetLoc=async()=>{$('pLocName').textContent='위치 확인 중…';$('pLocCoord').textContent='--';
+  try{ const l=await NW.getGPS(); $('pPickWrap').classList.add('hide'); pApplyLoc(l); }
+  catch(e){ $('pLocName').textContent='위치를 잡지 못했어요'; $('pLocCoord').textContent='지도에서 선택'; pShowPicker(); }
+};
+function pApplyLoc(l){pLoc=l;$('pLocName').textContent=l.name||'선택한 위치';$('pLocCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);pChk();}
+let pPicker=null;
+async function pShowPicker(){
+  $('pPickWrap').classList.remove('hide');
+  if(pPicker)return;
+  pPicker=await NW.locationPicker('pPick', pLoc||myLoc||NW.FALLBACK, (lat,lng)=>pApplyLoc({lat,lng,name:'지도에서 선택한 위치'}));
+}
 function pChk(){const b=$('pBtn');if(b)b.disabled=!($('pName').value.trim()&&pSel.cat&&pLoc);}
 window.submitPartner=async()=>{
   const {collection,addDoc,serverTimestamp}=NW.fb;
