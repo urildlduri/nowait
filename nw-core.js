@@ -80,6 +80,7 @@ NW.fbReady = (async()=>{
     const F  = await import(FB_BASE+"firebase-firestore.js");
     Object.assign(NW.fb, {
       getAuth:Au.getAuth, signInAnonymously:Au.signInAnonymously, onAuthStateChanged:Au.onAuthStateChanged,
+      GoogleAuthProvider:Au.GoogleAuthProvider, signInWithPopup:Au.signInWithPopup, signOut:Au.signOut,
       collection:F.collection, doc:F.doc, addDoc:F.addDoc, setDoc:F.setDoc, updateDoc:F.updateDoc,
       getDoc:F.getDoc, getDocs:F.getDocs, query:F.query, where:F.where, onSnapshot:F.onSnapshot,
       serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp
@@ -100,7 +101,10 @@ NW.fbReady = (async()=>{
 
 if(!NW.cfgOk){const w=NW.$('cfgWarn');if(w)w.classList.remove('hide');}
 
-/* ── 익명 인증 ── */
+/* ── 관리자 이메일 화이트리스트 ── */
+NW.ADMIN_EMAILS = ["urildlduri@gmail.com"];
+
+/* ── 익명 인증 (사용 안 함 — 구글 로그인으로 대체) ── */
 NW.ensureAuth = async function(){
   if(!NW.cfgOk) return null;
   await NW.fbReady;
@@ -108,9 +112,59 @@ NW.ensureAuth = async function(){
   if(NW.uid) return NW.uid;
   return new Promise(res=>{
     NW.fb.onAuthStateChanged(NW.auth,u=>{
-      if(u){NW.uid=u.uid;res(u.uid);}
-      else NW.fb.signInAnonymously(NW.auth).catch(e=>{NW.toast('인증 실패: '+(e.code||e.message));res(null);});
+      if(u){NW.uid=u.uid;NW.user=u;res(u.uid);} else res(null);
     });
-    NW.fb.signInAnonymously(NW.auth).catch(()=>{});
   });
 };
+
+/* ── 구글 로그인 ── */
+NW.googleLogin = async function(){
+  await NW.fbReady;
+  if(!NW.fbLoaded) throw new Error('firebase not loaded');
+  const {GoogleAuthProvider,signInWithPopup}=NW.fb;
+  const provider=new GoogleAuthProvider();
+  const res=await signInWithPopup(NW.auth,provider);
+  NW.uid=res.user.uid; NW.user=res.user;
+  await NW.ensureProfile(res.user);
+  return res.user;
+};
+NW.logout = async function(){
+  await NW.fbReady; if(NW.fb.signOut) await NW.fb.signOut(NW.auth);
+  location.href='index.html';
+};
+
+/* 로그인 상태 구독 (페이지 가드용). cb(user|null) */
+NW.onAuth = function(cb){
+  NW.fbReady.then(()=>{
+    if(!NW.fbLoaded){cb(null);return;}
+    NW.fb.onAuthStateChanged(NW.auth, async u=>{
+      if(u){NW.uid=u.uid;NW.user=u;await NW.ensureProfile(u);}
+      cb(u);
+    });
+  });
+};
+
+/* 프로필 문서 생성/조회 (nw_users/{uid}) */
+NW.ensureProfile = async function(u){
+  const {doc,getDoc,setDoc,serverTimestamp}=NW.fb;
+  const ref=doc(NW.db,'nw_users',u.uid);
+  const s=await getDoc(ref);
+  if(!s.exists()){
+    await setDoc(ref,{name:u.displayName||'',email:u.email||'',photo:u.photoURL||'',
+      role:'user', createdAt:serverTimestamp()});
+    NW.profile={name:u.displayName||'',email:u.email||'',role:'user'};
+  }else NW.profile=s.data();
+  return NW.profile;
+};
+NW.isAdmin = u => !!(u && u.email && NW.ADMIN_EMAILS.includes(u.email));
+
+/* 내 매장 조회 (승인된 것 우선). 반환 {id,...} 또는 null */
+NW.myBusiness = async function(){
+  if(!NW.uid) return null;
+  const {collection,query,where,getDocs}=NW.fb;
+  const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('ownerId','==',NW.uid)));
+  if(snap.empty) return null;
+  const list=snap.docs.map(d=>({id:d.id,...d.data()}));
+  return list.find(b=>b.approved)||list[0];
+};
+

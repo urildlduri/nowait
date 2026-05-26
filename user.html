@@ -116,11 +116,13 @@ let curCallId=null, callUnsub=null, callTimer=null, matchTimer=null, responses=[
 function subShow(id){document.querySelectorAll('.mobile>.scr').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');window.scrollTo(0,0);}
 window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();};
 
-(async function init(){
+(function init(){
   buildChips(); getLoc();
-  await NW.ensureAuth();
-  $('userUid').textContent = NW.uid?('ID '+NW.uid.slice(0,6)):'local';
-  refreshPenalty();
+  NW.onAuth(u=>{
+    if(!u){ location.href='index.html'; return; }
+    $('userUid').textContent = u.displayName? u.displayName.split(' ')[0] : ('ID '+NW.uid.slice(0,6));
+    refreshPenalty();
+  });
 })();
 
 function buildChips(){

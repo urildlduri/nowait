@@ -11,12 +11,27 @@
 <body>
 <div id="cfgWarn" class="hide"></div>
 
-<!-- 매장 등록 -->
-<div id="m-setup" class="scr on">
+<!-- 로딩 -->
+<div id="m-loading" class="scr on"><div class="standby" style="padding:80px 20px"><div class="big">⏳</div><p>매장 정보를 확인하는 중…</p></div></div>
+
+<!-- 승인 대기 -->
+<div id="m-pending" class="scr">
+  <div class="setup" style="text-align:center;padding-top:80px">
+    <div style="font-size:64px">🕒</div>
+    <div class="brand" style="font-size:28px;margin-top:16px">승인 대기 중</div>
+    <div class="muted" style="margin-top:12px" id="pendName">매장 신청이 접수되었어요.</div>
+    <div class="muted" style="margin-top:6px">관리자 승인 후 호출을 받을 수 있어요.</div>
+    <button class="cta ghost" style="margin-top:32px" onclick="location.href='index.html'">← 홈으로</button>
+    <button class="cta ghost" style="margin-top:10px" onclick="location.reload()">새로고침</button>
+  </div>
+</div>
+
+<!-- 매장 신청 -->
+<div id="m-setup" class="scr">
   <div class="setup">
     <div style="margin-bottom:8px"><a class="back" href="index.html" style="color:var(--tx2);font-weight:700">← 홈</a></div>
-    <div class="brand" style="font-size:32px">매장 등록</div>
-    <div class="brand-sub" style="text-align:left;margin-top:8px">호출을 받으려면 매장 정보가 필요해요.</div>
+    <div class="brand" style="font-size:32px">매장 파트너 신청</div>
+    <div class="brand-sub" style="text-align:left;margin-top:8px">신청 후 관리자 승인을 거치면 호출을 받을 수 있어요.</div>
     <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="bizName" placeholder="예) 강남 라운지펍"></div>
     <div class="field"><div class="field-lb">업종</div><div class="chips" id="bizCatChips"></div></div>
     <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="bizRadChips"></div></div>
@@ -36,9 +51,8 @@
     <div class="locbox"><div class="pin">📍</div>
       <div class="txt"><b id="bizLocName">위치 확인 중…</b><small id="bizLocCoord">--</small></div>
       <button onclick="getBizLoc()">새로고침</button></div>
-    <button class="cta" id="bizSaveBtn" onclick="saveBiz()" disabled>매장 등록하고 시작</button>
-    <button class="cta ghost" style="margin-top:10px" onclick="spawnDemo()">🧪 데모 매장 3개 자동 생성</button>
-    <div class="demo-hint">데모 매장은 현재 위치 주변에 자동 배치되어, 혼자서도 사용자 앱 호출을 받아볼 수 있습니다.</div>
+    <button class="cta" id="bizSaveBtn" onclick="saveBiz()" disabled>매장 파트너 신청하기</button>
+    <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 됩니다. 관리자(NOWAIT 운영팀)가 승인하면 매장 콘솔이 열려요.</div>
   </div>
 </div>
 
@@ -79,7 +93,23 @@ const stats={calls:0,resp:0,match:0,_seen:new Set()};
 
 function subShow(id){document.querySelectorAll('body>.scr').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');window.scrollTo(0,0);}
 
-(async function init(){buildBizChips();getBizLoc();await NW.ensureAuth();})();
+(function init(){
+  buildBizChips();
+  NW.onAuth(async u=>{
+    if(!u){ location.href='index.html'; return; }
+    getBizLoc();
+    const biz=await NW.myBusiness();
+    if(biz && biz.approved){
+      myBizId=biz.id; myBiz={...biz};
+      openConsole();
+    }else if(biz && !biz.approved){
+      $('pendName').textContent=`"${biz.name}" 신청이 접수되었어요.`;
+      subShow('m-pending');
+    }else{
+      subShow('m-setup');
+    }
+  });
+})();
 
 function buildBizChips(){
   $('bizCatChips').innerHTML=CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pickBizCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
@@ -100,7 +130,7 @@ window.getBizLoc=()=>{
 function applyBizLoc(l){bizLoc=l;$('bizLocName').textContent=l.name;$('bizLocCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);chkBiz();}
 
 window.saveBiz=async()=>{
-  if(!NW.cfgOk){toast('Firebase config를 먼저 설정하세요.');return;}
+  if(!NW.cfgOk){toast('Firebase 연결 필요');return;}
   const {collection,addDoc,serverTimestamp}=NW.fb;
   const menu=parseMenu($('bizMenu').value);
   const detail={
@@ -109,12 +139,14 @@ window.saveBiz=async()=>{
     parking:$('bizParking').classList.contains('on'),
     reservation:$('bizReserv').classList.contains('on')
   };
-  const ref=await addDoc(collection(NW.db,'nw_biz'),{
+  await addDoc(collection(NW.db,'nw_biz'),{
     name:$('bizName').value.trim(),cat:bizSel.cat,radius:bizSel.rad,
-    lat:bizLoc.lat,lng:bizLoc.lng,status:'open',ownerId:NW.uid,createdAt:serverTimestamp(),...detail});
-  myBizId=ref.id;
-  myBiz={name:$('bizName').value.trim(),cat:bizSel.cat,radius:bizSel.rad,lat:bizLoc.lat,lng:bizLoc.lng,status:'open'};
-  openConsole();
+    lat:bizLoc.lat,lng:bizLoc.lng,status:'open',
+    approved:false, ownerId:NW.uid, ownerName:NW.user?.displayName||'', ownerEmail:NW.user?.email||'',
+    createdAt:serverTimestamp(),...detail});
+  $('pendName').textContent=`"${$('bizName').value.trim()}" 신청이 접수되었어요.`;
+  subShow('m-pending');
+  toast('매장 신청 완료! 관리자 승인을 기다려 주세요.');
 };
 function parseMenu(txt){
   return txt.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{

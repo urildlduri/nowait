@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 관리자 이메일 (nw-core.js의 ADMIN_EMAILS와 동일하게 유지)
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['urildlduri@gmail.com'];
+    }
+    function signedIn() { return request.auth != null; }
+
+    // 사용자 프로필
+    match /nw_users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if request.auth.uid == uid;
+      // 히스토리 서브컬렉션
+      match /history/{doc} {
+        allow read, write: if request.auth.uid == uid;
+      }
+    }
+
+    // 매장
+    match /nw_biz/{id} {
+      // 누구나(로그인) 매장 목록 조회 가능 (매칭에 필요)
+      allow read: if signedIn();
+      // 신청 생성: 본인 소유로만
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.approved == false;
+      // 매장 주인은 자기 매장 상태 변경 가능(단 approved는 못 바꿈), 관리자는 전부 가능
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.ownerId == request.auth.uid
+            && request.resource.data.approved == resource.data.approved);
+      // 삭제는 관리자만
+      allow delete: if isAdmin();
+    }
+
+    // 호출
+    match /nw_calls/{id} {
+      allow read: if signedIn();
+      // 호출 생성: 본인 호출만
+      allow create: if signedIn() && request.resource.data.callerId == request.auth.uid;
+      // 상태 변경: 호출자 본인 또는 (응답하는) 로그인 매장
+      allow update: if signedIn();
+      allow delete: if isAdmin();
+      // 매장 응답 서브컬렉션
+      match /responses/{bizId} {
+        allow read: if signedIn();
+        allow write: if signedIn();
+      }
+    }
+  }
+}
