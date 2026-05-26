@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOWAIT · 관리자</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="nw.css">
+</head>
+<body>
+<div id="cfgWarn" class="hide"></div>
+
+<div class="adm-top">
+  <div style="display:flex;align-items:center;gap:14px">
+    <a class="back" href="index.html" style="color:var(--tx2);font-weight:700">← 홈</a>
+    <div class="lg">NO<span class="w">WAIT</span> <span style="font-size:13px;color:var(--tx3);font-weight:700">관리자</span></div>
+  </div>
+  <div class="live"><span class="d"></span>실시간 모니터링</div>
+</div>
+
+<div class="adm-wrap">
+  <div class="adm-stats">
+    <div class="adm-stat live"><div class="n mono" id="sLive">0</div><div class="l">진행중 호출</div></div>
+    <div class="adm-stat"><div class="n mono" id="sTotal">0</div><div class="l">총 호출</div></div>
+    <div class="adm-stat"><div class="n mono" id="sMatch" style="color:var(--ok)">0</div><div class="l">성사</div></div>
+    <div class="adm-stat"><div class="n mono" id="sNoshow" style="color:var(--no)">0</div><div class="l">노쇼</div></div>
+    <div class="adm-stat"><div class="n mono" id="sRate" style="color:var(--info)">0%</div><div class="l">매칭률</div></div>
+    <div class="adm-stat"><div class="n mono" id="sBiz">0</div><div class="l">등록 매장</div></div>
+  </div>
+
+  <div class="adm-tools">
+    <button class="adm-btn" onclick="cleanFinished()">🧹 종료된 호출 정리</button>
+    <button class="adm-btn danger" onclick="cleanDemo()">🗑 데모 매장 삭제</button>
+    <button class="adm-btn danger" onclick="cleanAll()">⚠ 전체 호출 초기화</button>
+  </div>
+
+  <div class="adm-grid">
+    <div class="adm-panel">
+      <h3>실시간 호출 피드 <span class="cnt" id="feedCnt">0건</span></h3>
+      <div class="adm-list" id="feed"><div class="adm-empty">호출 대기 중…</div></div>
+    </div>
+    <div class="adm-panel">
+      <h3>등록 매장 <span class="cnt" id="bizCnt">0곳</span></h3>
+      <div class="adm-list" id="bizList"><div class="adm-empty">등록된 매장이 없습니다.</div></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="nw-core.js"></script>
+<script>
+const {$,toast,fmtT,distLabel,nowMs,tsMs,catOf}=NW;
+let calls=[], biz=[];
+let callsUnsub=null, bizUnsub=null;
+
+const ST={
+  searching:['탐색중','st-search'], matched:['매칭','st-match'], done:['입장완료','st-done'],
+  noshow:['노쇼','st-noshow'], expired:['응답없음','st-expired'], cancelled:['취소','st-cancelled']
+};
+const BST={open:['영업중','st-open'],busy:['혼잡','st-busy'],closed:['마감','st-closed']};
+
+(async function init(){
+  await NW.ensureAuth();
+  if(!NW.cfgOk||!NW.fbLoaded){toast('Firebase 연결 필요');return;}
+  listen();
+  setInterval(render,1000); // 진행중/타이머 갱신
+})();
+
+function listen(){
+  const {collection,onSnapshot,query,orderBy}=NW.fb;
+  callsUnsub=onSnapshot(query(collection(NW.db,'nw_calls'),orderBy('createdAt','desc')),snap=>{
+    calls=snap.docs.map(d=>({id:d.id,...d.data()}));render();
+  },err=>{ // orderBy 인덱스 없을 때 fallback
+    onSnapshot(collection(NW.db,'nw_calls'),s=>{calls=s.docs.map(d=>({id:d.id,...d.data()}));render();});
+  });
+  bizUnsub=onSnapshot(collection(NW.db,'nw_biz'),snap=>{
+    biz=snap.docs.map(d=>({id:d.id,...d.data()}));renderBiz();
+  });
+}
+
+function isLive(c){return c.status==='searching' && (!c.expiresAt || tsMs(c.expiresAt)>nowMs());}
+
+function render(){
+  const live=calls.filter(isLive).length;
+  const total=calls.length;
+  const match=calls.filter(c=>['matched','done'].includes(c.status)).length;
+  const noshow=calls.filter(c=>c.status==='noshow').length;
+  const finished=calls.filter(c=>c.status!=='searching').length;
+  const rate=finished? Math.round((match/finished)*100):0;
+  $('sLive').textContent=live; $('sTotal').textContent=total;
+  $('sMatch').textContent=match; $('sNoshow').textContent=noshow;
+  $('sRate').textContent=rate+'%';
+  renderFeed();
+}
+function renderFeed(){
+  $('feedCnt').textContent=calls.length+'건';
+  if(calls.length===0){$('feed').innerHTML='<div class="adm-empty">호출 대기 중…</div>';return;}
+  $('feed').innerHTML=calls.slice(0,60).map(c=>{
+    const cat=catOf(c.cat);const st=ST[c.status]||['?','st-expired'];
+    const t=c.createdAt?.toDate?c.createdAt.toDate():null;
+    const ts=t?`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}:${String(t.getSeconds()).padStart(2,'0')}`:'--';
+    let extra='';
+    if(isLive(c)){const left=(tsMs(c.expiresAt)-nowMs())/1000;extra=` · ⏱${fmtT(left)}`;}
+    else if(c.status==='matched'&&c.matchExpiresAt){const left=(tsMs(c.matchExpiresAt)-nowMs())/1000;extra=left>0?` · 입장 ${fmtT(left)}`:' · 시간초과';}
+    const where=c.matchedBizName?` → ${c.matchedBizName}`:'';
+    return `<div class="adm-row"><div class="em">${cat.e}</div>
+      <div class="mid"><b>${c.party}명 · ${cat.n}${where}</b><small>${ts}${extra} · ${c.id.slice(0,6)}</small></div>
+      <span class="st ${st[1]}">${st[0]}</span></div>`;
+  }).join('');
+}
+function renderBiz(){
+  $('bizCnt').textContent=biz.length+'곳';$('sBiz').textContent=biz.length;
+  if(biz.length===0){$('bizList').innerHTML='<div class="adm-empty">등록된 매장이 없습니다.</div>';return;}
+  $('bizList').innerHTML=biz.map(b=>{const cat=catOf(b.cat);const st=BST[b.status]||['?','st-closed'];
+    return `<div class="adm-row"><div class="em">${cat.e}</div>
+      <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[데모]</span>':''}</b>
+      <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${(b.lat||0).toFixed(3)},${(b.lng||0).toFixed(3)}</small></div>
+      <span class="st ${st[1]}">${st[0]}</span></div>`;}).join('');
+}
+
+/* ── 테스트용 정리 도구 ── */
+async function delDocs(arr,col){
+  const {doc,deleteDoc}=NW.fb;let n=0;
+  for(const d of arr){await deleteDoc(doc(NW.db,col,d.id)).catch(()=>{});n++;}
+  return n;
+}
+window.cleanFinished=async()=>{
+  const target=calls.filter(c=>c.status!=='searching'&&c.status!=='matched');
+  if(!target.length){toast('정리할 종료 호출이 없어요.');return;}
+  if(!confirm(`종료된 호출 ${target.length}건을 삭제할까요?`))return;
+  const n=await delDocs(target,'nw_calls');toast(`${n}건 정리 완료`);
+};
+window.cleanDemo=async()=>{
+  const target=biz.filter(b=>b.demo);
+  if(!target.length){toast('데모 매장이 없어요.');return;}
+  if(!confirm(`데모 매장 ${target.length}곳을 삭제할까요?`))return;
+  const n=await delDocs(target,'nw_biz');toast(`데모 매장 ${n}곳 삭제`);
+};
+window.cleanAll=async()=>{
+  if(!calls.length){toast('호출이 없어요.');return;}
+  if(!confirm(`전체 호출 ${calls.length}건을 모두 삭제할까요? (되돌릴 수 없음)`))return;
+  const n=await delDocs(calls,'nw_calls');toast(`전체 ${n}건 초기화`);
+};
+window.addEventListener('beforeunload',()=>{if(callsUnsub)callsUnsub();if(bizUnsub)bizUnsub();});
+</script>
+</body>
+</html>

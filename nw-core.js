@@ -1,0 +1,93 @@
+/* ============================================================
+   NOWAIT 공통 코어  ·  nw-core.js
+   ① Firebase 설정은 여기 한 곳에서만 관리합니다.
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyBTcQKjBTXIl6UuNIndOuTI-nsBH5Wz0J4",
+  authDomain:        "nowait-84116.firebaseapp.com",
+  projectId:         "nowait-84116",
+  storageBucket:     "nowait-84116.firebasestorage.app",
+  messagingSenderId: "121578768600",
+  appId:             "1:121578768600:web:3c57e58e21945dca956fad"
+};
+/* ============================================================ */
+
+const NW = {};
+window.NW = NW;
+
+/* ── 상수 ── */
+NW.CATS = [
+  {k:'pub',     e:'🍺', n:'술집'},
+  {k:'karaoke', e:'🎤', n:'노래방'},
+  {k:'escape',  e:'🔓', n:'방탈출'},
+  {k:'golf',    e:'⛳', n:'스크린골프'},
+  {k:'party',   e:'🎉', n:'파티룸'},
+];
+NW.catOf  = k => NW.CATS.find(c=>c.k===k) || {e:'📍',n:k};
+NW.PARTY  = [2,3,4,5,6];
+NW.RADII  = [500,1000,2000];
+NW.CALL_TTL  = 60;        // 호출 응답 대기(초)
+NW.MATCH_TTL = 25*60;     // 입장 마감(초)
+NW.PENALTY   = 30*60;     // 노쇼 패널티(초)
+NW.FALLBACK  = {lat:37.4979, lng:127.0276, name:'강남역(기본값)'};
+
+/* ── 유틸 ── */
+NW.$ = id => document.getElementById(id);
+NW.toast = m=>{const t=NW.$('toast');if(!t)return;t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);};
+NW.fmtT = s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
+NW.haversine = (a,b)=>{const R=6371e3,r=x=>x*Math.PI/180;
+  const dla=r(b.lat-a.lat),dlo=r(b.lng-a.lng);
+  const x=Math.sin(dla/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dlo/2)**2;
+  return Math.round(R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));};
+NW.distLabel = m=>m>=1000?(m/1000).toFixed(1)+'km':m+'m';
+NW.nowMs = ()=>Date.now();
+NW.tsMs  = t=>t&&t.toMillis?t.toMillis():(t||0);
+
+/* ── Firebase 동적 로드 (file://·오프라인이어도 페이지는 살아있음) ── */
+NW.cfgOk = !FIREBASE_CONFIG.apiKey.startsWith("YOUR_");
+NW.fbLoaded = false;
+NW.uid = null;
+NW.fb = {};   // firestore/auth 함수 모음
+const FB_BASE = "https://www.gstatic.com/firebasejs/10.12.0/";
+
+NW.fbReady = (async()=>{
+  try{
+    const A  = await import(FB_BASE+"firebase-app.js");
+    const Au = await import(FB_BASE+"firebase-auth.js");
+    const F  = await import(FB_BASE+"firebase-firestore.js");
+    Object.assign(NW.fb, {
+      getAuth:Au.getAuth, signInAnonymously:Au.signInAnonymously, onAuthStateChanged:Au.onAuthStateChanged,
+      collection:F.collection, doc:F.doc, addDoc:F.addDoc, setDoc:F.setDoc, updateDoc:F.updateDoc,
+      getDoc:F.getDoc, getDocs:F.getDocs, query:F.query, where:F.where, onSnapshot:F.onSnapshot,
+      serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp
+    });
+    if(NW.cfgOk){
+      NW.app  = A.initializeApp(FIREBASE_CONFIG);
+      NW.auth = Au.getAuth(NW.app);
+      NW.db   = F.getFirestore(NW.app);
+    }
+    NW.fbLoaded = true;
+  }catch(e){
+    console.error('[NOWAIT] Firebase 로드 실패:',e);
+    const w=NW.$('cfgWarn');
+    if(w){w.classList.remove('hide');
+      w.textContent='⚠️ Firebase 로드 실패 — file://이 아닌 http(s)로 열어야 합니다. 콘솔(F12) 로그 참고.';}
+  }
+})();
+
+if(!NW.cfgOk){const w=NW.$('cfgWarn');if(w)w.classList.remove('hide');}
+
+/* ── 익명 인증 ── */
+NW.ensureAuth = async function(){
+  if(!NW.cfgOk) return null;
+  await NW.fbReady;
+  if(!NW.fbLoaded) return null;
+  if(NW.uid) return NW.uid;
+  return new Promise(res=>{
+    NW.fb.onAuthStateChanged(NW.auth,u=>{
+      if(u){NW.uid=u.uid;res(u.uid);}
+      else NW.fb.signInAnonymously(NW.auth).catch(e=>{NW.toast('인증 실패: '+(e.code||e.message));res(null);});
+    });
+    NW.fb.signInAnonymously(NW.auth).catch(()=>{});
+  });
+};
