@@ -15,6 +15,29 @@ const FIREBASE_CONFIG = {
 const NW = {};
 window.NW = NW;
 
+/* ── 카카오맵 (JavaScript 키 · 무료) ── */
+NW.KAKAO_KEY = "56d96a0427d001e4d5fd597bd5e458e0";
+NW.loadKakao = ()=> new Promise((res,rej)=>{
+  if(window.kakao && window.kakao.maps){res(window.kakao);return;}
+  const s=document.createElement('script');
+  s.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${NW.KAKAO_KEY}&autoload=false`;
+  s.onload=()=>window.kakao.maps.load(()=>res(window.kakao));
+  s.onerror=()=>rej(new Error('kakao sdk load fail'));
+  document.head.appendChild(s);
+});
+/* 카카오맵 길찾기 링크 (앱/웹에서 열림) */
+NW.kakaoRoute = (name,lat,lng)=>`https://map.kakao.com/link/to/${encodeURIComponent(name||'매장')},${lat},${lng}`;
+
+/* 업종별 데모 메뉴 샘플 */
+NW.DEMO_MENU = {
+  pub:[{name:'생맥주 500cc',price:5000},{name:'모둠 안주',price:23000},{name:'하이볼',price:7000}],
+  karaoke:[{name:'1시간 (룸)',price:18000},{name:'음료 세트',price:6000},{name:'서비스 30분',price:0}],
+  escape:[{name:'테마 입장 (2인)',price:44000},{name:'테마 입장 (4인)',price:80000}],
+  golf:[{name:'1시간 이용',price:30000},{name:'프리미엄 룸',price:45000}],
+  party:[{name:'2시간 대관',price:60000},{name:'파티 패키지',price:120000}]
+};
+NW.DEMO_HOURS = '매일 17:00 – 02:00';
+
 /* ── 상수 ── */
 NW.CATS = [
   {k:'pub',     e:'🍺', n:'술집'},

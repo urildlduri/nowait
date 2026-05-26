@@ -20,6 +20,19 @@
     <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="bizName" placeholder="예) 강남 라운지펍"></div>
     <div class="field"><div class="field-lb">업종</div><div class="chips" id="bizCatChips"></div></div>
     <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="bizRadChips"></div></div>
+    <div class="field"><div class="field-lb">사진 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
+      <input class="inp" id="bizPhoto" placeholder="https://...jpg (비우면 업종 아이콘)"></div>
+    <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
+      <textarea class="inp" id="bizMenu" rows="3" placeholder="생맥주 500cc,5000&#10;모둠 안주,23000"></textarea></div>
+    <div class="field"><div class="field-lb">영업시간 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
+      <input class="inp" id="bizHours" placeholder="매일 17:00 – 02:00"></div>
+    <div class="field"><div class="field-lb">전화번호 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
+      <input class="inp" id="bizPhone" placeholder="02-000-0000"></div>
+    <div class="field"><div class="field-lb">편의</div>
+      <div class="chips">
+        <button class="chip" id="bizParking" onclick="this.classList.toggle('on')">🅿 주차</button>
+        <button class="chip" id="bizReserv" onclick="this.classList.toggle('on')">📅 예약</button>
+      </div></div>
     <div class="locbox"><div class="pin">📍</div>
       <div class="txt"><b id="bizLocName">위치 확인 중…</b><small id="bizLocCoord">--</small></div>
       <button onclick="getBizLoc()">새로고침</button></div>
@@ -87,13 +100,26 @@ function applyBizLoc(l){bizLoc=l;$('bizLocName').textContent=l.name;$('bizLocCoo
 window.saveBiz=async()=>{
   if(!NW.cfgOk){toast('Firebase config를 먼저 설정하세요.');return;}
   const {collection,addDoc,serverTimestamp}=NW.fb;
+  const menu=parseMenu($('bizMenu').value);
+  const detail={
+    photo:$('bizPhoto').value.trim(), menu, hours:$('bizHours').value.trim(),
+    phone:$('bizPhone').value.trim(),
+    parking:$('bizParking').classList.contains('on'),
+    reservation:$('bizReserv').classList.contains('on')
+  };
   const ref=await addDoc(collection(NW.db,'nw_biz'),{
     name:$('bizName').value.trim(),cat:bizSel.cat,radius:bizSel.rad,
-    lat:bizLoc.lat,lng:bizLoc.lng,status:'open',ownerId:NW.uid,createdAt:serverTimestamp()});
+    lat:bizLoc.lat,lng:bizLoc.lng,status:'open',ownerId:NW.uid,createdAt:serverTimestamp(),...detail});
   myBizId=ref.id;
   myBiz={name:$('bizName').value.trim(),cat:bizSel.cat,radius:bizSel.rad,lat:bizLoc.lat,lng:bizLoc.lng,status:'open'};
   openConsole();
 };
+function parseMenu(txt){
+  return txt.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+    const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};
+    return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};
+  });
+}
 window.spawnDemo=async()=>{
   if(!NW.cfgOk){toast('Firebase config를 먼저 설정하세요.');return;}
   if(!bizLoc){toast('위치를 먼저 확인하세요.');return;}
@@ -101,7 +127,10 @@ window.spawnDemo=async()=>{
   const base=bizLoc,off=[[0.0012,0.0008],[-0.0009,0.0014],[0.0018,-0.0006]];
   const demos=[{name:'데모 라운지펍',cat:'pub'},{name:'데모 코인노래방',cat:'karaoke'},{name:'데모 방탈출 강남',cat:'escape'}];
   for(let i=0;i<demos.length;i++){
-    await addDoc(collection(NW.db,'nw_biz'),{...demos[i],radius:2000,lat:base.lat+off[i][0],lng:base.lng+off[i][1],status:'open',ownerId:'demo',demo:true,createdAt:serverTimestamp()});}
+    await addDoc(collection(NW.db,'nw_biz'),{...demos[i],radius:2000,
+      lat:base.lat+off[i][0],lng:base.lng+off[i][1],status:'open',ownerId:'demo',demo:true,
+      menu:NW.DEMO_MENU[demos[i].cat]||[], hours:NW.DEMO_HOURS, phone:'02-1234-567'+i,
+      parking:i!==2, reservation:true, photo:'', createdAt:serverTimestamp()});}
   toast('데모 매장 3개 생성 완료. 사용자 앱에서 호출해 보세요!');
 };
 
