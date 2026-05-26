@@ -21,8 +21,8 @@
     <div class="brand" style="font-size:28px;margin-top:16px">승인 대기 중</div>
     <div class="muted" style="margin-top:12px" id="pendName">매장 신청이 접수되었어요.</div>
     <div class="muted" style="margin-top:6px">관리자 승인 후 호출을 받을 수 있어요.</div>
-    <button class="cta ghost" style="margin-top:32px" onclick="location.href='index.html'">← 홈으로</button>
-    <button class="cta ghost" style="margin-top:10px" onclick="location.reload()">새로고침</button>
+    <button class="cta ghost" style="margin-top:32px" onclick="location.reload()">새로고침</button>
+    <button class="cta ghost" style="margin-top:10px" onclick="NW.logout()">로그아웃</button>
   </div>
 </div>
 
@@ -60,7 +60,10 @@
 <div id="m-console" class="scr">
   <div class="tab-top">
     <div class="lg">NO<span class="w">WAIT</span> <span style="font-size:13px;color:var(--tx3);font-weight:700">매장 콘솔</span></div>
-    <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
+      <div id="acct"></div>
+    </div>
   </div>
   <div class="tab-wrap">
     <div class="status-row">
@@ -172,6 +175,7 @@ window.spawnDemo=async()=>{
 
 function openConsole(){
   subShow('m-console');
+  NW.mountAccount('acct');
   $('cBizName').textContent=myBiz.name;
   $('cBizCat').textContent=catOf(myBiz.cat).e+' '+catOf(myBiz.cat).n+' · 반경 '+distLabel(myBiz.radius);
   $('cBizPin').textContent=myBiz.lat.toFixed(4)+', '+myBiz.lng.toFixed(4);

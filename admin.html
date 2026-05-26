@@ -17,6 +17,7 @@
     <div class="lg">NO<span class="w">WAIT</span> <span style="font-size:13px;color:var(--tx3);font-weight:700">관리자</span></div>
   </div>
   <div class="live"><span class="d"></span>실시간 모니터링</div>
+  <div id="acct"></div>
 </div>
 
 <div class="adm-wrap" id="admWrap" style="display:none">
@@ -59,7 +60,8 @@
   <div style="font-size:64px">🔒</div>
   <div class="brand" style="font-size:26px;margin-top:16px">관리자 전용</div>
   <div class="muted" style="margin-top:12px">이 페이지는 NOWAIT 운영팀만 접근할 수 있어요.</div>
-  <button class="cta ghost" style="max-width:240px;margin-top:28px" onclick="location.href='index.html'">← 홈으로</button>
+  <button class="cta ghost" style="max-width:240px;margin-top:28px" onclick="location.href='user.html'">사용자 앱으로 →</button>
+  <button class="cta ghost" style="max-width:240px;margin-top:10px" onclick="NW.logout()">다른 계정으로 로그인</button>
 </div>
 <div id="toast"></div>
 
@@ -80,6 +82,7 @@ const BST={open:['영업중','st-open'],busy:['혼잡','st-busy'],closed:['마�
     if(!u){ location.href='index.html'; return; }
     if(!NW.isAdmin(u)){ $('admWrap').style.display='none'; $('denyScr').classList.add('on'); return; }
     $('admWrap').style.display=''; 
+    NW.mountAccount('acct');
     if(!NW.cfgOk||!NW.fbLoaded){toast('Firebase 연결 필요');return;}
     listen();
     setInterval(render,1000);

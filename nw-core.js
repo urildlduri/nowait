@@ -144,6 +144,32 @@ NW.logout = async function(){
   location.href='index.html';
 };
 
+/* 공통 계정 메뉴 위젯 — 컨테이너 id를 받아 프로필칩+드롭다운 렌더 */
+NW.mountAccount = function(containerId){
+  const el=NW.$(containerId); if(!el||!NW.user)return;
+  const u=NW.user;
+  const initial=(u.displayName||u.email||'U').trim().charAt(0).toUpperCase();
+  const avatar=u.photoURL
+    ? `<img src="${u.photoURL}" style="width:30px;height:30px;border-radius:50%">`
+    : `<div style="width:30px;height:30px;border-radius:50%;background:var(--y);color:#000;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">${initial}</div>`;
+  el.style.position='relative';
+  el.innerHTML=`
+    <button id="nwAcctBtn" style="background:var(--bg2);border:1px solid var(--bd);border-radius:30px;padding:4px 10px 4px 4px;display:flex;align-items:center;gap:8px">
+      ${avatar}<span style="font-size:13px;font-weight:700;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.displayName||u.email}</span>
+      <span style="color:var(--tx3);font-size:10px">▼</span>
+    </button>
+    <div id="nwAcctMenu" class="hide" style="position:absolute;right:0;top:46px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:8px;min-width:200px;z-index:120;box-shadow:0 8px 24px rgba(0,0,0,.4)">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--bd);margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700">${u.displayName||''}</div>
+        <div style="font-size:12px;color:var(--tx3);font-family:var(--mono);margin-top:2px">${u.email||''}</div>
+      </div>
+      <button onclick="NW.logout()" style="width:100%;text-align:left;background:none;padding:10px 12px;border-radius:8px;font-size:14px;font-weight:600;color:var(--no)">로그아웃</button>
+    </div>`;
+  const btn=NW.$('nwAcctBtn'), menu=NW.$('nwAcctMenu');
+  btn.onclick=e=>{e.stopPropagation();menu.classList.toggle('hide');};
+  document.addEventListener('click',()=>menu.classList.add('hide'));
+};
+
 /* 로그인 상태 구독 (페이지 가드용). cb(user|null) */
 NW.onAuth = function(cb){
   NW.fbReady.then(async()=>{

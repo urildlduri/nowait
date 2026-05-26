@@ -13,7 +13,7 @@
 <div class="mobile">
   <div class="topbar">
     <div class="lg">NO<span class="w">WAIT</span></div>
-    <div class="uid" id="userUid" onclick="if(confirm('로그아웃 할까요?'))NW.logout()" style="cursor:pointer">·</div>
+    <div id="acct"></div>
   </div>
 
   <!-- 홈 -->
@@ -133,7 +133,7 @@ window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forE
     const role=await NW.getRole(u);
     if(role==='admin'){ location.replace('admin.html'); return; }
     if(role==='merchant'){ location.replace('merchant.html'); return; }
-    $('userUid').textContent = u.displayName? u.displayName.split(' ')[0] : ('ID '+NW.uid.slice(0,6));
+    NW.mountAccount('acct');
     refreshPenalty();
   });
 })();
