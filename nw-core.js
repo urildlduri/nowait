@@ -81,6 +81,7 @@ NW.fbReady = (async()=>{
     Object.assign(NW.fb, {
       getAuth:Au.getAuth, signInAnonymously:Au.signInAnonymously, onAuthStateChanged:Au.onAuthStateChanged,
       GoogleAuthProvider:Au.GoogleAuthProvider, signInWithPopup:Au.signInWithPopup, signOut:Au.signOut,
+      signInWithRedirect:Au.signInWithRedirect, getRedirectResult:Au.getRedirectResult,
       collection:F.collection, doc:F.doc, addDoc:F.addDoc, setDoc:F.setDoc, updateDoc:F.updateDoc,
       getDoc:F.getDoc, getDocs:F.getDocs, query:F.query, where:F.where, onSnapshot:F.onSnapshot,
       serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp
@@ -117,16 +118,26 @@ NW.ensureAuth = async function(){
   });
 };
 
-/* ── 구글 로그인 ── */
+/* ── 구글 로그인 (리다이렉트 방식 — GitHub Pages COOP 회피) ── */
 NW.googleLogin = async function(){
   await NW.fbReady;
   if(!NW.fbLoaded) throw new Error('firebase not loaded');
-  const {GoogleAuthProvider,signInWithPopup}=NW.fb;
+  const {GoogleAuthProvider,signInWithRedirect,signInWithPopup}=NW.fb;
   const provider=new GoogleAuthProvider();
-  const res=await signInWithPopup(NW.auth,provider);
-  NW.uid=res.user.uid; NW.user=res.user;
-  await NW.ensureProfile(res.user);
-  return res.user;
+  // 팝업 먼저 시도, COOP 등으로 막히면 리다이렉트로 폴백
+  try{
+    const res=await signInWithPopup(NW.auth,provider);
+    NW.uid=res.user.uid; NW.user=res.user;
+    await NW.ensureProfile(res.user);
+    return res.user;
+  }catch(e){
+    if(e.code==='auth/popup-blocked' || e.code==='auth/cancelled-popup-request'
+       || e.code==='auth/popup-closed-by-user' || String(e.message||'').includes('Cross-Origin')){
+      await signInWithRedirect(NW.auth,provider); // 페이지 이동 → 돌아오면 onAuth가 처리
+      return null;
+    }
+    throw e;
+  }
 };
 NW.logout = async function(){
   await NW.fbReady; if(NW.fb.signOut) await NW.fb.signOut(NW.auth);
@@ -135,8 +146,10 @@ NW.logout = async function(){
 
 /* 로그인 상태 구독 (페이지 가드용). cb(user|null) */
 NW.onAuth = function(cb){
-  NW.fbReady.then(()=>{
+  NW.fbReady.then(async()=>{
     if(!NW.fbLoaded){cb(null);return;}
+    // 리다이렉트 로그인에서 돌아온 경우 결과 수거
+    try{ if(NW.fb.getRedirectResult) await NW.fb.getRedirectResult(NW.auth); }catch(e){ console.warn('redirect result',e); }
     NW.fb.onAuthStateChanged(NW.auth, async u=>{
       if(u){NW.uid=u.uid;NW.user=u;await NW.ensureProfile(u);}
       cb(u);
@@ -167,4 +180,3 @@ NW.myBusiness = async function(){
   const list=snap.docs.map(d=>({id:d.id,...d.data()}));
   return list.find(b=>b.approved)||list[0];
 };
-
