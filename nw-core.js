@@ -52,7 +52,36 @@ NW.RADII  = [500,1000,2000];
 NW.CALL_TTL  = 60;        // 호출 응답 대기(초)
 NW.MATCH_TTL = 15*60;     // 입장 마감(초) — 자리 점유 최소화
 NW.PENALTY   = 30*60;     // 노쇼 패널티(초)
-NW.FALLBACK  = {lat:37.4979, lng:127.0276, name:'강남역(기본값)'};
+NW.FALLBACK  = {lat:37.4979, lng:127.0276, name:'강남역'}; // 지도 picker 초기 중심으로만 사용
+
+/* GPS 위치 획득 — 성공 시 {lat,lng}, 실패 시 reject(에러). 기본값으로 조용히 넘어가지 않음 */
+NW.getGPS = ()=> new Promise((res,rej)=>{
+  if(!navigator.geolocation){ rej(new Error('no-geo')); return; }
+  navigator.geolocation.getCurrentPosition(
+    p=>res({lat:p.coords.latitude, lng:p.coords.longitude, name:'현재 위치'}),
+    e=>rej(e),
+    {enableHighAccuracy:true, timeout:9000, maximumAge:0});
+});
+
+/* 지도 위치 선택 picker — boxId 컨테이너에 카카오맵을 띄우고, 탭/드래그로 좌표 선택.
+   onPick(lat,lng) 콜백 호출. 초기중심 center({lat,lng}) 선택적. */
+NW.locationPicker = async function(boxId, center, onPick){
+  const box=NW.$(boxId); if(!box) return;
+  const c = center || NW.FALLBACK;
+  try{
+    const kakao=await NW.loadKakao();
+    box.innerHTML='';
+    const ll=new kakao.maps.LatLng(c.lat,c.lng);
+    const map=new kakao.maps.Map(box,{center:ll,level:4});
+    const marker=new kakao.maps.Marker({map,position:ll,draggable:true});
+    const upd=p=>{ marker.setPosition(p); onPick(p.getLat(),p.getLng()); };
+    kakao.maps.event.addListener(map,'click',e=>upd(e.latLng));
+    kakao.maps.event.addListener(marker,'dragend',()=>onPick(marker.getPosition().getLat(),marker.getPosition().getLng()));
+    return {map,marker};
+  }catch(e){
+    box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:12px;text-align:center;padding:10px">지도 로드 실패 — 좌표 직접 입력으로 진행하세요</div>';
+  }
+};
 
 /* ── 유틸 ── */
 NW.$ = id => document.getElementById(id);
@@ -238,4 +267,3 @@ NW.myBusiness = async function(){
   const list=snap.docs.map(d=>({id:d.id,...d.data()}));
   return list.find(b=>b.approved)||list[0];
 };
-
