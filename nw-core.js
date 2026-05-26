@@ -50,7 +50,7 @@ NW.catOf  = k => NW.CATS.find(c=>c.k===k) || {e:'📍',n:k};
 NW.PARTY  = [2,3,4,5,6];
 NW.RADII  = [500,1000,2000];
 NW.CALL_TTL  = 60;        // 호출 응답 대기(초)
-NW.MATCH_TTL = 25*60;     // 입장 마감(초)
+NW.MATCH_TTL = 15*60;     // 입장 마감(초) — 자리 점유 최소화
 NW.PENALTY   = 30*60;     // 노쇼 패널티(초)
 NW.FALLBACK  = {lat:37.4979, lng:127.0276, name:'강남역(기본값)'};
 

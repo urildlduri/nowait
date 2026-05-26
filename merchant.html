@@ -63,6 +63,8 @@
     <div id="callsArea">
       <div class="standby"><div class="big">📡</div><h3>호출 대기 중</h3><p>반경 안에서 호출이 오면 즉시 표시됩니다.</p><div class="pin" id="cBizPin">·</div></div>
     </div>
+    <div class="h2" style="font-size:17px;margin-top:32px">🎯 도착 예정 손님 <span id="arrCnt" style="color:var(--tx3);font-size:13px;font-weight:600"></span></div>
+    <div id="arrArea"><div class="standby" style="padding:24px"><p>아직 확정된 손님이 없습니다.</p></div></div>
   </div>
 </div>
 <div id="toast"></div>
@@ -139,7 +141,33 @@ function openConsole(){
   $('cBizName').textContent=myBiz.name;
   $('cBizCat').textContent=catOf(myBiz.cat).e+' '+catOf(myBiz.cat).n+' · 반경 '+distLabel(myBiz.radius);
   $('cBizPin').textContent=myBiz.lat.toFixed(4)+', '+myBiz.lng.toFixed(4);
-  setBizStatus(myBiz.status,true); listenCalls();
+  setBizStatus(myBiz.status,true); listenCalls(); listenArrivals();
+}
+let arrUnsub=null, arrivals=[], arrTimer=null;
+function listenArrivals(){
+  const {collection,query,where,onSnapshot}=NW.fb;
+  const q=query(collection(NW.db,'nw_calls'),where('matchedBizId','==',myBizId));
+  arrUnsub=onSnapshot(q,snap=>{
+    arrivals=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.status==='matched');
+    renderArrivals();
+  });
+  clearInterval(arrTimer);arrTimer=setInterval(renderArrivals,1000);
+}
+function renderArrivals(){
+  const area=$('arrArea');
+  $('arrCnt').textContent=arrivals.length?`(${arrivals.length}팀)`:'';
+  if(!arrivals.length){area.innerHTML='<div class="standby" style="padding:24px"><p>아직 확정된 손님이 없습니다.</p></div>';return;}
+  area.innerHTML='<div class="calls-grid">'+arrivals.map(c=>{
+    const cat=catOf(c.cat);
+    const left=c.matchExpiresAt?(tsMs(c.matchExpiresAt)-nowMs())/1000:0;
+    const uid=(c.callerId||'').slice(0,6)||'guest';
+    const over=left<=0;
+    return `<div class="callcard" style="border-color:${over?'var(--no)':'var(--ok)'}">
+      <div class="ch"><div class="party">${c.party}<span>명</span></div>
+        <div class="dist mono" style="background:${over?'var(--nobg)':'var(--okbg)'};color:${over?'var(--no)':'var(--ok)'}">${over?'시간초과':'도착중'}</div></div>
+      <div class="cmeta">${cat.e} ${cat.n} · 손님 <span class="mono">#${uid}</span></div>
+      <div class="ctimer mono" style="color:${over?'var(--no)':'var(--soon)'}">⏱ ${over?'마감 — 노쇼 처리됨':fmtT(left)+' 내 도착 예정'}</div>
+      </div>`;}).join('')+'</div>';
 }
 window.setBizStatus=async(s,silent)=>{
   myBiz.status=s;
@@ -193,7 +221,7 @@ window.respond=async(callId,type)=>{
     else if(['matched','expired','cancelled','done','noshow'].includes(d.status))un();});
   const el=$('call-'+callId);if(el){const btn=el.querySelector('.resp-row');if(btn)btn.outerHTML='<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>';}
 };
-window.addEventListener('beforeunload',()=>{if(callsUnsub)callsUnsub();});
+window.addEventListener('beforeunload',()=>{if(callsUnsub)callsUnsub();if(arrUnsub)arrUnsub();});
 </script>
 </body>
 </html>

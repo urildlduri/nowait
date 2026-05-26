@@ -40,6 +40,10 @@
       <div class="sr-timer mono" id="srTimer">0:60</div>
       <div class="sr-status" id="srStatus">주변 매장에 요청을 보내는 중…</div>
       <div class="sr-cnt">응답 <b id="srCount">0</b>곳 도착</div>
+      <div id="sortBar" class="hide" style="display:flex;gap:8px;margin-top:16px;justify-content:center">
+        <button class="chip on" id="sort-dist" onclick="setSort('dist')">📍 거리순</button>
+        <button class="chip" id="sort-wait" onclick="setSort('wait')">⏱ 대기 짧은순</button>
+      </div>
       <div class="reslist" id="resList"></div>
       <button class="cta ghost" style="margin-top:22px" onclick="cancelCall()">취소</button>
     </div>
@@ -77,7 +81,7 @@
         <div class="ok-ic">✓</div>
         <h2 id="mName">매칭 완료</h2>
         <div class="sub" id="mSub">지금 바로 입장 가능합니다</div>
-        <div class="countdown"><div class="lb">입장 마감까지</div><div class="t mono" id="mTimer">25:00</div></div>
+        <div class="countdown"><div class="lb">입장 마감까지</div><div class="t mono" id="mTimer">15:00</div></div>
       </div>
       <div class="bizdetail" id="mDetail"></div>
       <button class="cta" onclick="arrive()">✓ 도착 완료</button>
@@ -175,12 +179,26 @@ function listenResponses(){
     $('srCount').textContent=responses.length; renderResponses();
   });
 }
+let sortMode='dist';
+window.setSort=m=>{sortMode=m;
+  $('sort-dist').classList.toggle('on',m==='dist');
+  $('sort-wait').classList.toggle('on',m==='wait');
+  renderResponses();};
 function renderResponses(){
-  const ok=responses.filter(r=>r.type==='ok').sort((a,b)=>a.dist-b.dist);
-  const soon=responses.filter(r=>r.type==='soon').sort((a,b)=>a.dist-b.dist);
-  let h='';
-  if(ok.length)h+=`<div class="grp-lb"><span class="dot" style="background:var(--ok)"></span>지금 가능 ${ok.length}곳</div>`+ok.map(card).join('');
-  if(soon.length)h+=`<div class="grp-lb"><span class="dot" style="background:var(--soon)"></span>10분 후 가능 ${soon.length}곳</div>`+soon.map(card).join('');
+  $('sortBar').classList.toggle('hide',responses.length===0);
+  let list=[...responses];
+  if(sortMode==='wait'){
+    // 빠른순: ok(0) → soon(1), 같은 그룹 내 거리순
+    list.sort((a,b)=>(a.type==='ok'?0:1)-(b.type==='ok'?0:1)||a.dist-b.dist);
+  }else{
+    list.sort((a,b)=>a.dist-b.dist); // 거리순
+  }
+  const okCnt=responses.filter(r=>r.type==='ok').length;
+  const soonCnt=responses.filter(r=>r.type==='soon').length;
+  let h=`<div class="grp-lb" style="color:var(--tx2);font-weight:600;font-size:12px;margin:14px 0 10px">
+    <span class="dot" style="background:var(--ok)"></span>지금 가능 ${okCnt}곳
+    <span class="dot" style="background:var(--soon);margin-left:10px"></span>10분 후 ${soonCnt}곳</div>`;
+  h+=list.map(card).join('');
   $('resList').innerHTML=h;
 }
 function card(r){const c=catOf(r.cat||sel.cat);
