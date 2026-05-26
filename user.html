@@ -127,8 +127,12 @@ window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forE
 
 (function init(){
   buildChips(); getLoc();
-  NW.onAuth(u=>{
+  NW.onAuth(async u=>{
     if(!u){ location.href='index.html'; return; }
+    // 1계정 1역할: 매장/관리자 계정은 제 페이지로 튕김
+    const role=await NW.getRole(u);
+    if(role==='admin'){ location.replace('admin.html'); return; }
+    if(role==='merchant'){ location.replace('merchant.html'); return; }
     $('userUid').textContent = u.displayName? u.displayName.split(' ')[0] : ('ID '+NW.uid.slice(0,6));
     refreshPenalty();
   });

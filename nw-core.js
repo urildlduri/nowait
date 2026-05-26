@@ -171,6 +171,38 @@ NW.ensureProfile = async function(u){
 };
 NW.isAdmin = u => !!(u && u.email && NW.ADMIN_EMAILS.includes(u.email));
 
+/* 계정의 단일 역할 판별: 'admin' | 'merchant' | 'user'
+   - 관리자 이메일 → admin
+   - 승인된 매장 보유 → merchant
+   - 그 외 → user (승인대기 신청이 있어도 아직은 user) */
+NW.getRole = async function(u){
+  if(NW.isAdmin(u)) return 'admin';
+  const biz=await NW.myBusiness();
+  if(biz && biz.approved) return 'merchant';
+  return 'user';
+};
+
+/* 내 역할 판별: 'admin' | 'merchant' | 'user' */
+NW.resolveRole = async function(u){
+  if(NW.isAdmin(u)) return 'admin';
+  const biz=await NW.myBusiness();
+  if(biz && biz.approved) return 'merchant';
+  return 'user';
+};
+/* 페이지 가드: 로그인 필수 + 역할 일치 아니면 제자리로 리다이렉트.
+   want='user'|'merchant'|'admin'. onOk(user,role) 호출. */
+NW.guardPage = function(want, onOk){
+  NW.onAuth(async u=>{
+    if(!u){ location.replace('index.html'); return; }
+    const role=await NW.resolveRole(u);
+    if(role!==want){
+      const dest = role==='admin'?'admin.html' : role==='merchant'?'merchant.html' : 'user.html';
+      location.replace(dest); return;
+    }
+    onOk(u, role);
+  });
+};
+
 /* 내 매장 조회 (승인된 것 우선). 반환 {id,...} 또는 null */
 NW.myBusiness = async function(){
   if(!NW.uid) return null;
