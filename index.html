@@ -39,21 +39,7 @@
   </div>
 </section>
 
-<!-- 역할 선택 (로그인 후) -->
-<section id="roleScr" class="scr login-wrap">
-  <div class="me-bar"><img id="meImg" src="" alt=""><span class="nm" id="meName">·</span>
-    <button class="lo" onclick="NW.logout()">로그아웃</button></div>
-  <div class="brand" style="font-size:34px">어디로 가시겠어요?</div>
-  <div class="hub-cards">
-    <a class="hub-card usr" href="user.html"><div class="ico">🙋</div>
-      <div><h3>사용자용</h3><p>지금 갈 곳을 찾고 호출해요</p></div></a>
-    <a class="hub-card" id="merchCard" href="merchant.html"><div class="ico">🏪</div>
-      <div><h3 id="merchTitle">매장용 (점주)</h3><p id="merchDesc">호출을 받고 1탭 응답</p></div></a>
-    <a class="hub-card hide" id="adminCard" href="admin.html"><div class="ico">📊</div>
-      <div><h3>관리자용</h3><p>파트너 승인·실시간 모니터링</p></div></a>
-  </div>
-  <div class="ver">v2.0 · Google 로그인</div>
-</section>
+<!-- 로그인 후 자동 분기 (index.html은 라우터 역할만) -->
 
 <div id="toast"></div>
 <script src="nw-core.js"></script>
@@ -75,16 +61,12 @@ window.doLogin=async()=>{
 };
 
 async function afterLogin(u){
-  $('meImg').src=u.photoURL||''; $('meName').textContent=u.displayName||u.email;
-  // 관리자면 관리자 카드 노출
-  if(NW.isAdmin(u)) $('adminCard').classList.remove('hide');
-  // 매장 신청 상태 반영
+  // 역할 자동 분기
+  if(NW.isAdmin(u)){ location.replace('admin.html'); return; }
   const biz=await NW.myBusiness();
-  if(biz){
-    if(biz.approved){$('merchTitle').textContent='매장 콘솔 (승인됨)';$('merchDesc').textContent=biz.name+' · 호출 받기';}
-    else{$('merchTitle').textContent='매장 신청 검토중';$('merchDesc').textContent='관리자 승인을 기다리고 있어요';}
-  }
-  showScr('roleScr');
+  if(biz && biz.approved){ location.replace('merchant.html'); return; }
+  // 그 외 전부 사용자 앱
+  location.replace('user.html');
 }
 </script>
 </body>

@@ -12,9 +12,8 @@
 <div id="cfgWarn" class="hide"></div>
 <div class="mobile">
   <div class="topbar">
-    <a class="back" href="index.html">← 홈</a>
     <div class="lg">NO<span class="w">WAIT</span></div>
-    <div class="uid" id="userUid">·</div>
+    <div class="uid" id="userUid" onclick="if(confirm('로그아웃 할까요?'))NW.logout()" style="cursor:pointer">·</div>
   </div>
 
   <!-- 홈 -->
@@ -100,8 +99,18 @@
     </div>
   </div>
 
+  <!-- 파트너 신청 -->
+  <div id="u-partner" class="scr">
+    <div class="page">
+      <div class="h1">매장 파트너</div>
+      <div class="muted" style="margin-top:8px">사장님이세요? 매장을 등록하고 손님 호출을 받아보세요.</div>
+      <div id="partnerBody"></div>
+    </div>
+  </div>
+
   <div class="bnav">
     <button id="n-home" class="on" onclick="uGo('u-home','n-home')"><span class="bi">🔍</span>호출</button>
+    <button id="n-partner" onclick="uGo('u-partner','n-partner')"><span class="bi">🏪</span>파트너</button>
     <button id="n-my" onclick="uGo('u-my','n-my')"><span class="bi">👤</span>MY</button>
   </div>
 </div>
@@ -114,7 +123,7 @@ let myLoc=null, sel={party:null,cat:null};
 let curCallId=null, callUnsub=null, callTimer=null, matchTimer=null, responses=[];
 
 function subShow(id){document.querySelectorAll('.mobile>.scr').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');window.scrollTo(0,0);}
-window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();};
+window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();};
 
 (function init(){
   buildChips(); getLoc();
@@ -349,6 +358,64 @@ function renderPenaltyBannerMy(){const el=$('myStatus');
   if(penalActive()){const left=Math.ceil((penaltyUntil-nowMs())/60000);
     el.innerHTML=`<div class="penalty"><div class="pi">⛔</div><div><b>노쇼 패널티 적용 중</b><div class="pt">약 ${left}분 후 해제</div></div></div>`;}
   else el.innerHTML=`<div class="statbox"><b style="color:var(--ok)">✓ 정상 이용 가능</b><div class="muted" style="margin-top:6px">패널티 없음</div></div>`;}
+/* ── 매장 파트너 ── */
+const P_CATS=NW.CATS, P_RADII=NW.RADII;
+let pSel={cat:null,rad:1000}, pLoc=null;
+async function renderPartner(){
+  const body=$('partnerBody');
+  const biz=await NW.myBusiness();
+  if(biz && biz.approved){
+    body.innerHTML=`<div class="statbox" style="margin-top:20px"><b style="color:var(--ok)">✓ 승인된 파트너</b>
+      <div class="muted" style="margin-top:6px">${biz.name}</div></div>
+      <button class="cta" style="margin-top:16px" onclick="location.href='merchant.html'">매장 콘솔 열기 →</button>`;
+    return;
+  }
+  if(biz && !biz.approved){
+    body.innerHTML=`<div class="penalty" style="border-color:var(--soon);background:var(--soonbg);margin-top:20px">
+      <div class="pi">🕒</div><div><b style="color:var(--soon)">승인 대기 중</b>
+      <div class="pt" style="color:var(--soon)">"${biz.name}" · 관리자 검토중</div></div></div>
+      <div class="demo-hint">관리자가 승인하면 다음 로그인 때 매장 콘솔로 바로 연결돼요.</div>`;
+    return;
+  }
+  // 신청 폼
+  body.innerHTML=`
+    <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="pName" placeholder="예) 강남 라운지펍"></div>
+    <div class="field"><div class="field-lb">업종</div><div class="chips" id="pCat"></div></div>
+    <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="pRad"></div></div>
+    <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
+      <textarea class="inp" id="pMenu" rows="3" placeholder="생맥주 500cc,5000&#10;모둠 안주,23000"></textarea></div>
+    <div class="field"><div class="field-lb">영업시간 / 전화 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
+      <input class="inp" id="pHours" placeholder="매일 17:00 – 02:00" style="margin-bottom:8px">
+      <input class="inp" id="pPhone" placeholder="02-000-0000"></div>
+    <div class="locbox"><div class="pin">📍</div>
+      <div class="txt"><b id="pLocName">위치 확인 중…</b><small id="pLocCoord">--</small></div>
+      <button onclick="pGetLoc()">새로고침</button></div>
+    <button class="cta" id="pBtn" onclick="submitPartner()" disabled>매장 파트너 신청하기</button>
+    <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 되고, 관리자(NOWAIT 운영팀) 승인 후 매장 콘솔이 열려요.</div>`;
+  $('pCat').innerHTML=P_CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pPickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
+  $('pRad').innerHTML=P_RADII.map(r=>`<button class="chip ${r===1000?'on':''}" data-r="${r}" onclick="pPickRad(${r})">${distLabel(r)}</button>`).join('');
+  $('pName').addEventListener('input',pChk);
+  pGetLoc();
+}
+window.pPickCat=k=>{pSel.cat=k;document.querySelectorAll('#pCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));pChk();};
+window.pPickRad=r=>{pSel.rad=r;document.querySelectorAll('#pRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
+window.pGetLoc=()=>{$('pLocName').textContent='위치 확인 중…';
+  if(!navigator.geolocation){pApplyLoc(FALLBACK);return;}
+  navigator.geolocation.getCurrentPosition(p=>pApplyLoc({lat:p.coords.latitude,lng:p.coords.longitude,name:'현재 위치'}),()=>pApplyLoc(FALLBACK),{timeout:8000});};
+function pApplyLoc(l){pLoc=l;$('pLocName').textContent=l.name;$('pLocCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);pChk();}
+function pChk(){const b=$('pBtn');if(b)b.disabled=!($('pName').value.trim()&&pSel.cat&&pLoc);}
+window.submitPartner=async()=>{
+  const {collection,addDoc,serverTimestamp}=NW.fb;
+  const menu=$('pMenu').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};});
+  await addDoc(collection(NW.db,'nw_biz'),{
+    name:$('pName').value.trim(),cat:pSel.cat,radius:pSel.rad,lat:pLoc.lat,lng:pLoc.lng,status:'open',
+    approved:false,ownerId:NW.uid,ownerName:NW.user?.displayName||'',ownerEmail:NW.user?.email||'',
+    menu,hours:$('pHours').value.trim(),phone:$('pPhone').value.trim(),parking:false,reservation:true,
+    photo:'',createdAt:serverTimestamp()});
+  toast('매장 신청 완료! 관리자 승인을 기다려 주세요.');
+  renderPartner();
+};
+
 window.addEventListener('beforeunload',()=>{if(callUnsub)callUnsub();});
 </script>
 </body>
