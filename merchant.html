@@ -216,7 +216,7 @@ function openConsole(){
   NW.mountAccount('acct');
   $('cBizName').textContent=myBiz.name;
   $('cBizCat').textContent=catOf(myBiz.cat).e+' '+catOf(myBiz.cat).n+' · 반경 '+distLabel(myBiz.radius);
-  $('cBizPin').textContent=myBiz.lat.toFixed(4)+', '+myBiz.lng.toFixed(4);
+  const pin=$('cBizPin'); if(pin) pin.textContent=myBiz.lat.toFixed(4)+', '+myBiz.lng.toFixed(4);
   const p2=$('cBizPin2'); if(p2) p2.textContent=myBiz.lat.toFixed(5)+', '+myBiz.lng.toFixed(5)+' · 반경 '+distLabel(myBiz.radius);
   setBizStatus(myBiz.status,true); listenCalls(); listenArrivals();
 }
