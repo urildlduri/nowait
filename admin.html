@@ -43,6 +43,23 @@
     <div class="adm-list" id="pendList"><div class="adm-empty">대기 중인 신청이 없습니다.</div></div>
   </div>
 
+  <!-- 핫플 관리 -->
+  <div class="adm-panel" style="margin-bottom:24px">
+    <h3>🔥 이 주변 핫플 관리 <span class="cnt" id="hotCnt">0곳</span></h3>
+    <div style="padding:16px 18px;border-bottom:1px solid var(--bd);display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <input class="inp" id="hName" placeholder="이름 *" style="margin:0">
+      <input class="inp" id="hTag" placeholder="태그 (예: 웨이팅순삭)" style="margin:0">
+      <input class="inp" id="hDesc" placeholder="한 줄 설명" style="margin:0;grid-column:1/3">
+      <input class="inp" id="hPhoto" placeholder="사진 URL (선택)" style="margin:0">
+      <input class="inp" id="hEmoji" placeholder="이모지 (사진 없을 때, 예: 🍜)" style="margin:0">
+      <input class="inp" id="hLat" placeholder="위도 (선택)" style="margin:0">
+      <input class="inp" id="hLng" placeholder="경도 (선택)" style="margin:0">
+      <button class="adm-btn" style="grid-column:1/3;color:var(--y);border-color:var(--y)" onclick="addHot()">+ 핫플 추가</button>
+      <button class="adm-btn" style="grid-column:1/3" onclick="useMyLoc()">📍 현재 위치를 위도·경도에 채우기</button>
+    </div>
+    <div class="adm-list" id="hotList"><div class="adm-empty">등록된 핫플이 없습니다.</div></div>
+  </div>
+
   <div class="adm-grid">
     <div class="adm-panel">
       <h3>실시간 호출 피드 <span class="cnt" id="feedCnt">0건</span></h3>
@@ -99,7 +116,46 @@ function listen(){
   bizUnsub=onSnapshot(collection(NW.db,'nw_biz'),snap=>{
     biz=snap.docs.map(d=>({id:d.id,...d.data()}));renderBiz();
   });
+  onSnapshot(collection(NW.db,'nw_hotplaces'),snap=>{
+    hots=snap.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.order??0)-(b.order??0));
+    renderHots();
+  });
 }
+let hots=[];
+function renderHots(){
+  $('hotCnt').textContent=hots.length+'곳';
+  if(!hots.length){$('hotList').innerHTML='<div class="adm-empty">등록된 핫플이 없습니다.</div>';return;}
+  $('hotList').innerHTML=hots.map(h=>{
+    const img=h.photo?`<img src="${h.photo}" style="width:38px;height:38px;border-radius:8px;object-fit:cover">`:`<div class="em">${h.emoji||'🔥'}</div>`;
+    return `<div class="adm-row">${img}
+      <div class="mid"><b>${h.name} ${h.tag?`<span style="color:var(--info);font-size:11px">#${h.tag}</span>`:''}</b>
+      <small>${h.desc||''} ${h.lat?`· ${(+h.lat).toFixed(3)},${(+h.lng).toFixed(3)}`:''}</small></div>
+      <button class="adm-btn danger" style="padding:6px 10px" onclick="delHot('${h.id}','${(h.name||'').replace(/'/g,'')}')">삭제</button></div>`;
+  }).join('');
+}
+window.useMyLoc=()=>{
+  if(!navigator.geolocation){toast('위치 불가');return;}
+  navigator.geolocation.getCurrentPosition(p=>{$('hLat').value=p.coords.latitude.toFixed(6);$('hLng').value=p.coords.longitude.toFixed(6);toast('현재 위치 입력됨');},()=>toast('위치 권한 거부됨'));
+};
+window.addHot=async()=>{
+  const name=$('hName').value.trim();
+  if(!name){toast('이름을 입력하세요');return;}
+  const {collection,addDoc,serverTimestamp}=NW.fb;
+  await addDoc(collection(NW.db,'nw_hotplaces'),{
+    name, tag:$('hTag').value.trim(), desc:$('hDesc').value.trim(),
+    photo:$('hPhoto').value.trim(), emoji:$('hEmoji').value.trim()||'🔥',
+    lat:parseFloat($('hLat').value)||null, lng:parseFloat($('hLng').value)||null,
+    order:hots.length, createdAt:serverTimestamp()
+  }).catch(e=>toast('추가 실패: '+e.message));
+  ['hName','hTag','hDesc','hPhoto','hEmoji','hLat','hLng'].forEach(id=>$(id).value='');
+  toast('🔥 핫플 추가 완료');
+};
+window.delHot=async(id,name)=>{
+  if(!confirm(`"${name}" 핫플을 삭제할까요?`))return;
+  const {doc,deleteDoc}=NW.fb;
+  await deleteDoc(doc(NW.db,'nw_hotplaces',id)).catch(e=>toast('삭제 실패: '+e.message));
+  toast('삭제 완료');
+};
 
 function isLive(c){return c.status==='searching' && (!c.expiresAt || tsMs(c.expiresAt)>nowMs());}
 
