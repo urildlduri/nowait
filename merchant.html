@@ -62,10 +62,14 @@
     <div class="lg">NO<span class="w">WAIT</span> <span style="font-size:13px;color:var(--tx3);font-weight:700">매장 콘솔</span></div>
     <div style="display:flex;align-items:center;gap:16px">
       <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
+      <button class="adm-btn" style="padding:8px 12px;font-size:12px" onclick="openEdit()">⚙ 매장 수정</button>
       <div id="acct"></div>
     </div>
   </div>
   <div class="tab-wrap">
+    <div class="locbox" style="margin-top:0;margin-bottom:18px"><div class="pin">📍</div>
+      <div class="txt"><b>현재 매장 위치</b><small id="cBizPin2">·</small></div>
+      <button onclick="openEdit()">위치 수정</button></div>
     <div class="status-row">
       <button class="status-btn s-open on" id="st-open" onclick="setBizStatus('open')"><span class="si">🟢</span>영업중</button>
       <button class="status-btn s-busy" id="st-busy" onclick="setBizStatus('busy')"><span class="si">🟡</span>혼잡</button>
@@ -82,6 +86,36 @@
     </div>
     <div class="h2" style="font-size:17px;margin-top:32px">🎯 도착 예정 손님 <span id="arrCnt" style="color:var(--tx3);font-size:13px;font-weight:600"></span></div>
     <div id="arrArea"><div class="standby" style="padding:24px"><p>아직 확정된 손님이 없습니다.</p></div></div>
+  </div>
+</div>
+
+<!-- 매장 정보 수정 -->
+<div id="m-edit" class="scr">
+  <div class="setup">
+    <div style="margin-bottom:8px"><button class="back" onclick="subShow('m-console')" style="background:none;color:var(--tx2);font-weight:700">← 콘솔로</button></div>
+    <div class="brand" style="font-size:30px">매장 정보 수정</div>
+    <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="eName"></div>
+    <div class="field"><div class="field-lb">업종</div><div class="chips" id="eCat"></div></div>
+    <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="eRad"></div></div>
+    <div class="field"><div class="field-lb">위치 좌표 <span style="color:var(--tx3);font-weight:500">(직접 입력 가능)</span></div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="eLat" placeholder="위도" style="margin:0">
+        <input class="inp" id="eLng" placeholder="경도" style="margin:0"></div>
+      <button class="cta ghost" style="margin-top:8px" onclick="eUseGps()">📍 현재 위치(GPS)로 설정</button>
+      <div id="eMap" style="width:100%;height:200px;border-radius:var(--rad);margin-top:10px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
+      <div class="muted" style="font-size:12px;margin-top:6px">지도를 탭하면 그 위치로 매장이 이동해요.</div></div>
+    <div class="field"><div class="field-lb">사진 URL</div><input class="inp" id="ePhoto" placeholder="https://...jpg"></div>
+    <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
+      <textarea class="inp" id="eMenu" rows="3"></textarea></div>
+    <div class="field"><div class="field-lb">영업시간 / 전화</div>
+      <input class="inp" id="eHours" placeholder="매일 17:00 – 02:00" style="margin-bottom:8px">
+      <input class="inp" id="ePhone" placeholder="02-000-0000"></div>
+    <div class="field"><div class="field-lb">편의</div>
+      <div class="chips">
+        <button class="chip" id="eParking" onclick="this.classList.toggle('on')">🅿 주차</button>
+        <button class="chip" id="eReserv" onclick="this.classList.toggle('on')">📅 예약</button></div></div>
+    <button class="cta" onclick="saveEdit()">저장하기</button>
+    <button class="cta ghost" style="margin-top:10px" onclick="subShow('m-console')">취소</button>
   </div>
 </div>
 <div id="toast"></div>
@@ -183,8 +217,73 @@ function openConsole(){
   $('cBizName').textContent=myBiz.name;
   $('cBizCat').textContent=catOf(myBiz.cat).e+' '+catOf(myBiz.cat).n+' · 반경 '+distLabel(myBiz.radius);
   $('cBizPin').textContent=myBiz.lat.toFixed(4)+', '+myBiz.lng.toFixed(4);
+  const p2=$('cBizPin2'); if(p2) p2.textContent=myBiz.lat.toFixed(5)+', '+myBiz.lng.toFixed(5)+' · 반경 '+distLabel(myBiz.radius);
   setBizStatus(myBiz.status,true); listenCalls(); listenArrivals();
 }
+
+/* ── 매장 정보 수정 ── */
+let eSel={cat:null,rad:1000}, eMap=null, eMarker=null;
+window.openEdit=()=>{
+  subShow('m-edit');
+  eSel={cat:myBiz.cat, rad:myBiz.radius||1000};
+  $('eName').value=myBiz.name||'';
+  $('eLat').value=(+myBiz.lat).toFixed(6);
+  $('eLng').value=(+myBiz.lng).toFixed(6);
+  $('ePhoto').value=myBiz.photo||'';
+  $('eMenu').value=(myBiz.menu||[]).map(m=>`${m.name},${m.price||0}`).join('\n');
+  $('eHours').value=myBiz.hours||'';
+  $('ePhone').value=myBiz.phone||'';
+  $('eParking').classList.toggle('on',!!myBiz.parking);
+  $('eReserv').classList.toggle('on',!!myBiz.reservation);
+  $('eCat').innerHTML=CATS.map(c=>`<button class="chip ${c.k===eSel.cat?'on':''}" data-c="${c.k}" onclick="ePickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
+  $('eRad').innerHTML=RADII.map(r=>`<button class="chip ${r===eSel.rad?'on':''}" data-r="${r}" onclick="ePickRad(${r})">${distLabel(r)}</button>`).join('');
+  drawEditMap();
+};
+window.ePickCat=k=>{eSel.cat=k;document.querySelectorAll('#eCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));};
+window.ePickRad=r=>{eSel.rad=r;document.querySelectorAll('#eRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
+window.eUseGps=()=>{
+  if(!navigator.geolocation){toast('GPS 불가');return;}
+  toast('현재 위치 확인 중…');
+  navigator.geolocation.getCurrentPosition(p=>{
+    $('eLat').value=p.coords.latitude.toFixed(6);$('eLng').value=p.coords.longitude.toFixed(6);
+    toast('현재 위치로 설정됨');drawEditMap();
+  },()=>toast('위치 권한 거부됨'),{enableHighAccuracy:true,timeout:8000});
+};
+async function drawEditMap(){
+  const box=$('eMap'); const lat=parseFloat($('eLat').value), lng=parseFloat($('eLng').value);
+  if(isNaN(lat)||isNaN(lng)){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:13px">좌표를 입력하세요</div>';return;}
+  try{
+    const kakao=await NW.loadKakao();
+    box.innerHTML='';
+    const center=new kakao.maps.LatLng(lat,lng);
+    eMap=new kakao.maps.Map(box,{center,level:4});
+    eMarker=new kakao.maps.Marker({map:eMap,position:center,draggable:true});
+    // 지도 클릭 → 마커 이동 + 좌표 갱신
+    kakao.maps.event.addListener(eMap,'click',e=>{
+      const ll=e.latLng;eMarker.setPosition(ll);
+      $('eLat').value=ll.getLat().toFixed(6);$('eLng').value=ll.getLng().toFixed(6);
+    });
+    kakao.maps.event.addListener(eMarker,'dragend',()=>{
+      const ll=eMarker.getPosition();$('eLat').value=ll.getLat().toFixed(6);$('eLng').value=ll.getLng().toFixed(6);
+    });
+  }catch(e){ box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:12px;text-align:center;padding:10px">지도 로드 실패 — 좌표는 직접 입력 가능</div>'; }
+}
+window.saveEdit=async()=>{
+  const lat=parseFloat($('eLat').value), lng=parseFloat($('eLng').value);
+  if(!$('eName').value.trim()){toast('매장 이름을 입력하세요');return;}
+  if(isNaN(lat)||isNaN(lng)){toast('위치 좌표가 필요해요');return;}
+  const menu=$('eMenu').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};});
+  const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,lat,lng,
+    photo:$('ePhoto').value.trim(),menu,hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
+    parking:$('eParking').classList.contains('on'),reservation:$('eReserv').classList.contains('on')};
+  const {doc,updateDoc}=NW.fb;
+  await updateDoc(doc(NW.db,'nw_biz',myBizId),patch).catch(e=>{toast('저장 실패: '+e.message);throw e;});
+  myBiz={...myBiz,...patch};
+  // 업종/반경/위치 바뀌었으니 리스너 재시작
+  if(callsUnsub)callsUnsub();
+  toast('매장 정보 저장 완료');
+  openConsole();
+};
 let arrUnsub=null, arrivals=[], arrTimer=null;
 function listenArrivals(){
   const {collection,query,where,onSnapshot}=NW.fb;
@@ -221,15 +320,18 @@ window.setBizStatus=async(s,silent)=>{
 };
 function listenCalls(){
   const {collection,query,where,onSnapshot}=NW.fb;
-  const q=query(collection(NW.db,'nw_calls'),where('cat','==',myBiz.cat),where('status','==','searching'));
+  // 단일 where(cat)만 사용 → 복합 인덱스 불필요. status는 클라이언트에서 필터.
+  const q=query(collection(NW.db,'nw_calls'),where('cat','==',myBiz.cat));
   callsUnsub=onSnapshot(q,snap=>{
     const list=[];
     snap.forEach(d=>{const c={id:d.id,...d.data()};
-      const exp=tsMs(c.expiresAt);if(exp&&exp<nowMs())return;
-      const dist=haversine(myBiz,{lat:c.lat,lng:c.lng});if(dist>myBiz.radius)return;
+      if(c.status!=='searching')return;                     // 탐색중만
+      const exp=tsMs(c.expiresAt);if(exp&&exp<nowMs())return; // 만료 제외
+      const dist=haversine(myBiz,{lat:c.lat,lng:c.lng});
+      if(dist>(myBiz.radius||2000))return;                   // 반경 밖 제외
       c._dist=dist;list.push(c);});
     renderCalls(list);
-  });
+  },err=>{ console.error('[listenCalls] 쿼리 오류:',err); toast('호출 수신 오류: '+(err.code||err.message)); });
 }
 function renderCalls(list){
   list.forEach(c=>{if(!stats._seen.has(c.id)){stats._seen.add(c.id);stats.calls++;}});
