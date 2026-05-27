@@ -27,7 +27,8 @@
         <div class="txt"><b id="locName">위치 확인 중…</b><small id="locCoord">--</small></div>
         <button onclick="getLoc()">새로고침</button></div>
       <div id="locPickWrap" class="hide">
-        <div class="muted" style="font-size:13px;margin-top:10px">위치를 자동으로 못 잡았어요. 아래 지도에서 <b>내 위치를 탭</b>해 주세요.</div>
+        <div class="muted" style="font-size:13px;margin-top:10px">위치를 자동으로 못 잡았어요. <b>주소 검색</b>하거나 지도에서 <b>내 위치를 탭</b>해 주세요.</div>
+        <button class="cta ghost" style="margin-top:8px" onclick="uSearchAddr()">🔎 주소로 찾기</button>
         <div id="locPick" style="width:100%;height:220px;border-radius:var(--rad);margin-top:10px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
       </div>
       <div id="penaltyBanner"></div>
@@ -221,6 +222,12 @@ async function showLocPicker(){
     applyLoc({lat,lng,name:'지도에서 선택한 위치'});
   });
 }
+window.uSearchAddr=()=>{
+  NW.searchAddress(r=>{
+    if(r.lat&&r.lng) applyLoc({lat:r.lat,lng:r.lng,name:r.address});
+    else showLocPicker();
+  });
+};
 
 let penaltyUntil=0;
 async function refreshPenalty(){
@@ -484,6 +491,8 @@ async function renderPartner(){
     <div class="locbox"><div class="pin">📍</div>
       <div class="txt"><b id="pLocName">위치 확인 중…</b><small id="pLocCoord">--</small></div>
       <button onclick="pGetLoc()">새로고침</button></div>
+    <button class="cta ghost" style="margin-top:10px" onclick="pSearchAddr()">🔎 주소로 위치 찾기</button>
+    <div id="pAddr" class="muted" style="font-size:12px;margin-top:6px"></div>
     <div id="pPickWrap" class="hide">
       <div class="muted" style="font-size:13px;margin-top:8px">지도에서 <b>매장 위치를 탭</b>하세요.</div>
       <div id="pPick" style="width:100%;height:200px;border-radius:var(--rad);margin-top:8px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div></div>
@@ -507,6 +516,13 @@ async function pShowPicker(){
   if(pPicker)return;
   pPicker=await NW.locationPicker('pPick', pLoc||myLoc||NW.FALLBACK, (lat,lng)=>pApplyLoc({lat,lng,name:'지도에서 선택한 위치'}));
 }
+window.pSearchAddr=()=>{
+  NW.searchAddress(r=>{
+    $('pAddr').textContent='📍 '+r.address;
+    if(r.lat&&r.lng) pApplyLoc({lat:r.lat,lng:r.lng,name:r.address});
+    else pShowPicker();
+  });
+};
 function pChk(){const b=$('pBtn');if(b)b.disabled=!($('pName').value.trim()&&pSel.cat&&pLoc);}
 window.submitPartner=async()=>{
   const {collection,addDoc,serverTimestamp}=NW.fb;
