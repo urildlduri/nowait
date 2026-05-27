@@ -70,7 +70,10 @@ NW.DEMO_MENU = {
   escape:[{name:'테마 입장 (2인)',price:44000},{name:'테마 입장 (4인)',price:80000}],
   golf:[{name:'1시간 이용',price:30000},{name:'프리미엄 룸',price:45000}],
   party:[{name:'2시간 대관',price:60000},{name:'파티 패키지',price:120000}],
-  stay:[{name:'대실 3시간',price:30000},{name:'숙박 (1박)',price:60000}]
+  stay:[{name:'대실 3시간',price:30000},{name:'숙박 (1박)',price:60000}],
+  massage:[{name:'전신 60분',price:50000},{name:'발 마사지 40분',price:30000}],
+  board:[{name:'음료+보드게임 2시간',price:12000},{name:'룸 대여 (4인)',price:30000}],
+  pcroom:[{name:'1시간',price:1500},{name:'심야 패키지',price:8000}]
 };
 NW.DEMO_HOURS = '매일 17:00 – 02:00';
 
@@ -82,6 +85,9 @@ NW.CATS = [
   {k:'golf',    e:'⛳', n:'스크린골프'},
   {k:'party',   e:'🎉', n:'파티룸'},
   {k:'stay',    e:'🏨', n:'숙박'},
+  {k:'massage', e:'💆', n:'마사지'},
+  {k:'board',   e:'🎲', n:'보드카페'},
+  {k:'pcroom',  e:'🖥️', n:'PC방'},
 ];
 NW.catOf  = k => NW.CATS.find(c=>c.k===k) || {e:'📍',n:k};
 NW.PARTY  = [1,2,3,4,5,6];
