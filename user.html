@@ -263,6 +263,7 @@ async function autoRespondDemo(callId){
     const demos=snap.docs.map(d=>({id:d.id,...d.data()}))
       .filter(b=>b.demo && b.approved!==false);
     demos.forEach(b=>{
+      if(sel.party < (b.minParty||1)) return;   // 최소 인원 미달
       const dist=haversine(myLoc,{lat:b.lat,lng:b.lng});
       if(dist>(b.radius||2000)) return;       // 반경 밖이면 응답 안 함
       const type=Math.random()<0.75?'ok':'soon';
