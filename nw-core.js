@@ -34,7 +34,8 @@ NW.DEMO_MENU = {
   karaoke:[{name:'1시간 (룸)',price:18000},{name:'음료 세트',price:6000},{name:'서비스 30분',price:0}],
   escape:[{name:'테마 입장 (2인)',price:44000},{name:'테마 입장 (4인)',price:80000}],
   golf:[{name:'1시간 이용',price:30000},{name:'프리미엄 룸',price:45000}],
-  party:[{name:'2시간 대관',price:60000},{name:'파티 패키지',price:120000}]
+  party:[{name:'2시간 대관',price:60000},{name:'파티 패키지',price:120000}],
+  stay:[{name:'대실 3시간',price:30000},{name:'숙박 (1박)',price:60000}]
 };
 NW.DEMO_HOURS = '매일 17:00 – 02:00';
 
@@ -45,9 +46,10 @@ NW.CATS = [
   {k:'escape',  e:'🔓', n:'방탈출'},
   {k:'golf',    e:'⛳', n:'스크린골프'},
   {k:'party',   e:'🎉', n:'파티룸'},
+  {k:'stay',    e:'🏨', n:'숙박'},
 ];
 NW.catOf  = k => NW.CATS.find(c=>c.k===k) || {e:'📍',n:k};
-NW.PARTY  = [2,3,4,5,6];
+NW.PARTY  = [1,2,3,4,5,6];
 NW.RADII  = [500,1000,2000];
 NW.CALL_TTL  = 60;        // 호출 응답 대기(초)
 NW.MATCH_TTL = 15*60;     // 입장 마감(초) — 자리 점유 최소화
