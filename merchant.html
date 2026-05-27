@@ -97,6 +97,8 @@
     <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="eName"></div>
     <div class="field"><div class="field-lb">업종</div><div class="chips" id="eCat"></div></div>
     <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="eRad"></div></div>
+    <div class="field"><div class="field-lb">최소 수용 인원 <span style="color:var(--tx3);font-weight:500">(이 인원 미만 호출은 안 받음)</span></div>
+      <div class="chips" id="eMinParty"></div></div>
     <div class="field"><div class="field-lb">위치 좌표 <span style="color:var(--tx3);font-weight:500">(직접 입력 가능)</span></div>
       <div style="display:flex;gap:8px">
         <input class="inp" id="eLat" placeholder="위도" style="margin:0">
@@ -225,7 +227,7 @@ function openConsole(){
 let eSel={cat:null,rad:1000}, eMap=null, eMarker=null;
 window.openEdit=()=>{
   subShow('m-edit');
-  eSel={cat:myBiz.cat, rad:myBiz.radius||1000};
+  eSel={cat:myBiz.cat, rad:myBiz.radius||1000, minParty:myBiz.minParty||1};
   $('eName').value=myBiz.name||'';
   $('eLat').value=(+myBiz.lat).toFixed(6);
   $('eLng').value=(+myBiz.lng).toFixed(6);
@@ -237,10 +239,12 @@ window.openEdit=()=>{
   $('eReserv').classList.toggle('on',!!myBiz.reservation);
   $('eCat').innerHTML=CATS.map(c=>`<button class="chip ${c.k===eSel.cat?'on':''}" data-c="${c.k}" onclick="ePickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
   $('eRad').innerHTML=RADII.map(r=>`<button class="chip ${r===eSel.rad?'on':''}" data-r="${r}" onclick="ePickRad(${r})">${distLabel(r)}</button>`).join('');
+  $('eMinParty').innerHTML=[1,2,3,4].map(n=>`<button class="chip ${n===eSel.minParty?'on':''}" data-m="${n}" onclick="ePickMin(${n})">${n}명${n===4?'+':' 이상'}</button>`).join('');
   drawEditMap();
 };
 window.ePickCat=k=>{eSel.cat=k;document.querySelectorAll('#eCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));};
 window.ePickRad=r=>{eSel.rad=r;document.querySelectorAll('#eRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
+window.ePickMin=n=>{eSel.minParty=n;document.querySelectorAll('#eMinParty .chip').forEach(b=>b.classList.toggle('on',+b.dataset.m===n));};
 window.eUseGps=()=>{
   if(!navigator.geolocation){toast('GPS 불가');return;}
   toast('현재 위치 확인 중…');
@@ -273,7 +277,7 @@ window.saveEdit=async()=>{
   if(!$('eName').value.trim()){toast('매장 이름을 입력하세요');return;}
   if(isNaN(lat)||isNaN(lng)){toast('위치 좌표가 필요해요');return;}
   const menu=$('eMenu').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};});
-  const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,lat,lng,
+  const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,minParty:eSel.minParty||1,lat,lng,
     photo:$('ePhoto').value.trim(),menu,hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
     parking:$('eParking').classList.contains('on'),reservation:$('eReserv').classList.contains('on')};
   const {doc,updateDoc}=NW.fb;
@@ -327,6 +331,7 @@ function listenCalls(){
     snap.forEach(d=>{const c={id:d.id,...d.data()};
       if(c.status!=='searching')return;                     // 탐색중만
       const exp=tsMs(c.expiresAt);if(exp&&exp<nowMs())return; // 만료 제외
+      if(c.party < (myBiz.minParty||1))return;               // 최소 인원 미달 제외
       const dist=haversine(myBiz,{lat:c.lat,lng:c.lng});
       if(dist>(myBiz.radius||2000))return;                   // 반경 밖 제외
       c._dist=dist;list.push(c);});
