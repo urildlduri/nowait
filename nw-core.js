@@ -20,13 +20,48 @@ NW.KAKAO_KEY = "56d96a0427d001e4d5fd597bd5e458e0";
 NW.loadKakao = ()=> new Promise((res,rej)=>{
   if(window.kakao && window.kakao.maps){res(window.kakao);return;}
   const s=document.createElement('script');
-  s.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${NW.KAKAO_KEY}&autoload=false`;
+  s.src=`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${NW.KAKAO_KEY}&autoload=false&libraries=services`;
   s.onload=()=>window.kakao.maps.load(()=>res(window.kakao));
   s.onerror=()=>rej(new Error('kakao sdk load fail'));
   document.head.appendChild(s);
 });
 /* 카카오맵 길찾기 링크 (앱/웹에서 열림) */
 NW.kakaoRoute = (name,lat,lng)=>`https://map.kakao.com/link/to/${encodeURIComponent(name||'매장')},${lat},${lng}`;
+
+/* 다음 우편번호 스크립트 로더 (무료, 키 불필요) */
+NW.loadPostcode = ()=> new Promise((res,rej)=>{
+  if(window.daum && window.daum.Postcode){res();return;}
+  const s=document.createElement('script');
+  s.src='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
+  s.onload=()=>res(); s.onerror=()=>rej(new Error('postcode load fail'));
+  document.head.appendChild(s);
+});
+
+/* 주소 검색 → 좌표 변환. onResult({address, lat, lng}) 콜백.
+   1) 다음 우편번호 팝업으로 주소 선택
+   2) 카카오 Geocoder(무료 JS SDK)로 주소→좌표 변환 */
+NW.searchAddress = async function(onResult){
+  try{
+    await NW.loadPostcode();
+    const kakao=await NW.loadKakao();
+    // geocoder는 services 라이브러리 필요 — loadKakao가 libraries 포함해야 함
+    if(!kakao.maps.services){ NW.toast('주소 변환 모듈 로드 실패'); return; }
+    new window.daum.Postcode({
+      oncomplete:function(data){
+        const addr=data.roadAddress||data.jibunAddress||data.address;
+        const geocoder=new kakao.maps.services.Geocoder();
+        geocoder.addressSearch(addr,(result,status)=>{
+          if(status===kakao.maps.services.Status.OK && result[0]){
+            onResult({address:addr, lat:parseFloat(result[0].y), lng:parseFloat(result[0].x)});
+          }else{
+            NW.toast('주소를 좌표로 변환하지 못했어요. 지도에서 선택해 주세요.');
+            onResult({address:addr, lat:null, lng:null});
+          }
+        });
+      }
+    }).open();
+  }catch(e){ console.error('searchAddress',e); NW.toast('주소 검색을 열 수 없어요'); }
+};
 
 /* 업종별 데모 메뉴 샘플 */
 NW.DEMO_MENU = {
