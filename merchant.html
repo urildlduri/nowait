@@ -99,8 +99,10 @@
     <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="eRad"></div></div>
     <div class="field"><div class="field-lb">최소 수용 인원 <span style="color:var(--tx3);font-weight:500">(이 인원 미만 호출은 안 받음)</span></div>
       <div class="chips" id="eMinParty"></div></div>
-    <div class="field"><div class="field-lb">위치 좌표 <span style="color:var(--tx3);font-weight:500">(직접 입력 가능)</span></div>
-      <div style="display:flex;gap:8px">
+    <div class="field"><div class="field-lb">위치 — 주소로 찾기 또는 지도에서 선택</div>
+      <button class="cta ghost" style="margin-top:0" onclick="eSearchAddr()">🔎 주소 검색</button>
+      <div id="eAddr" class="muted" style="font-size:12px;margin-top:8px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
         <input class="inp" id="eLat" placeholder="위도" style="margin:0">
         <input class="inp" id="eLng" placeholder="경도" style="margin:0"></div>
       <button class="cta ghost" style="margin-top:8px" onclick="eUseGps()">📍 현재 위치(GPS)로 설정</button>
@@ -252,6 +254,12 @@ window.eUseGps=()=>{
     $('eLat').value=p.coords.latitude.toFixed(6);$('eLng').value=p.coords.longitude.toFixed(6);
     toast('현재 위치로 설정됨');drawEditMap();
   },()=>toast('위치 권한 거부됨'),{enableHighAccuracy:true,timeout:8000});
+};
+window.eSearchAddr=()=>{
+  NW.searchAddress(r=>{
+    $('eAddr').textContent='📍 '+r.address;
+    if(r.lat&&r.lng){$('eLat').value=r.lat.toFixed(6);$('eLng').value=r.lng.toFixed(6);drawEditMap();toast('주소 위치로 설정됨');}
+  });
 };
 async function drawEditMap(){
   const box=$('eMap'); const lat=parseFloat($('eLat').value), lng=parseFloat($('eLng').value);
