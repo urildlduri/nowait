@@ -155,7 +155,7 @@ window.openEdit=()=>{
   $('eReserv').classList.toggle('on',!!myBiz.reservation);
   $('eCat').innerHTML=CATS.map(c=>`<button class="chip ${c.k===eSel.cat?'on':''}" data-c="${c.k}" onclick="ePickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
   $('eRad').innerHTML=RADII.map(r=>`<button class="chip ${r===eSel.rad?'on':''}" data-r="${r}" onclick="ePickRad(${r})">${distLabel(r)}</button>`).join('');
-  $('eMinParty').innerHTML=[1,2,3,4].map(n=>`<button class="chip ${n===eSel.minParty?'on':''}" data-m="${n}" onclick="ePickMin(${n})">${n}명${n===4?'+':' 이상'}</button>`).join('');
+  $('eMinParty').innerHTML=[1,2,3,4].map(n=>`<button class="chip ${n===eSel.minParty?'on':''}" data-m="${n}" onclick="ePickMin(${n})">${n}명 가능${n===4?'+':''}</button>`).join('');
   drawEditMap();
 };
 window.ePickCat=k=>{eSel.cat=k;document.querySelectorAll('#eCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));};
