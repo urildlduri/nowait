@@ -27,34 +27,8 @@
 </div>
 
 <!-- 매장 신청 -->
-<div id="m-setup" class="scr">
-  <div class="setup">
-    <div style="margin-bottom:8px"><a class="back" href="index.html" style="color:var(--tx2);font-weight:700">← 홈</a></div>
-    <div class="brand" style="font-size:32px">매장 파트너 신청</div>
-    <div class="brand-sub" style="text-align:left;margin-top:8px">신청 후 관리자 승인을 거치면 호출을 받을 수 있어요.</div>
-    <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="bizName" placeholder="예) 강남 라운지펍"></div>
-    <div class="field"><div class="field-lb">업종</div><div class="chips" id="bizCatChips"></div></div>
-    <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="bizRadChips"></div></div>
-    <div class="field"><div class="field-lb">사진 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
-      <input class="inp" id="bizPhoto" placeholder="https://...jpg (비우면 업종 아이콘)"></div>
-    <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
-      <textarea class="inp" id="bizMenu" rows="3" placeholder="생맥주 500cc,5000&#10;모둠 안주,23000"></textarea></div>
-    <div class="field"><div class="field-lb">영업시간 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
-      <input class="inp" id="bizHours" placeholder="매일 17:00 – 02:00"></div>
-    <div class="field"><div class="field-lb">전화번호 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
-      <input class="inp" id="bizPhone" placeholder="02-000-0000"></div>
-    <div class="field"><div class="field-lb">편의</div>
-      <div class="chips">
-        <button class="chip" id="bizParking" onclick="this.classList.toggle('on')">🅿 주차</button>
-        <button class="chip" id="bizReserv" onclick="this.classList.toggle('on')">📅 예약</button>
-      </div></div>
-    <div class="locbox"><div class="pin">📍</div>
-      <div class="txt"><b id="bizLocName">위치 확인 중…</b><small id="bizLocCoord">--</small></div>
-      <button onclick="getBizLoc()">새로고침</button></div>
-    <button class="cta" id="bizSaveBtn" onclick="saveBiz()" disabled>매장 파트너 신청하기</button>
-    <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 됩니다. 관리자(NOWAIT 운영팀)가 승인하면 매장 콘솔이 열려요.</div>
-  </div>
-</div>
+<!-- (매장 신청은 사용자앱 '파트너' 탭에서 진행 — m-setup 폼 제거됨) -->
+
 
 <!-- 운영 콘솔 -->
 <div id="m-console" class="scr">
@@ -135,13 +109,10 @@ const stats={calls:0,resp:0,match:0,_seen:new Set()};
 function subShow(id){document.querySelectorAll('body>.scr').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');window.scrollTo(0,0);}
 
 (function init(){
-  buildBizChips();
   NW.onAuth(async u=>{
     if(!u){ location.href='index.html'; return; }
-    getBizLoc();
     const biz=await NW.myBusiness();
     if(NW.isAdmin(u)){
-      // 관리자는 슈퍼유저: 데모 매장이 있으면 그걸로 콘솔 미리보기, 없으면 안내
       if(biz){ myBizId=biz.id; myBiz={...biz}; openConsole(); }
       else { subShow('m-pending'); $('pendName').textContent='관리자 계정 — 등록된 매장이 없어요. (관리자 페이지에서 데모 매장 생성 가능)'; }
       return;
@@ -157,63 +128,6 @@ function subShow(id){document.querySelectorAll('body>.scr').forEach(s=>s.classLi
     }
   });
 })();
-
-function buildBizChips(){
-  $('bizCatChips').innerHTML=CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pickBizCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
-  $('bizRadChips').innerHTML=RADII.map(r=>`<button class="chip ${r===1000?'on':''}" data-r="${r}" onclick="pickRad(${r})">${distLabel(r)}</button>`).join('');
-}
-window.pickBizCat=k=>{bizSel.cat=k;document.querySelectorAll('#bizCatChips .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));chkBiz();};
-window.pickRad=r=>{bizSel.rad=r;document.querySelectorAll('#bizRadChips .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
-function chkBiz(){$('bizSaveBtn').disabled=!($('bizName').value.trim()&&bizSel.cat&&bizLoc&&NW.cfgOk);}
-$('bizName').addEventListener('input',chkBiz);
-
-window.getBizLoc=()=>{
-  $('bizLocName').textContent='위치 확인 중…';
-  if(!navigator.geolocation){applyBizLoc(NW.FALLBACK);return;}
-  navigator.geolocation.getCurrentPosition(
-    p=>applyBizLoc({lat:p.coords.latitude,lng:p.coords.longitude,name:'현재 위치'}),
-    ()=>applyBizLoc(NW.FALLBACK),{enableHighAccuracy:true,timeout:8000});
-};
-function applyBizLoc(l){bizLoc=l;$('bizLocName').textContent=l.name;$('bizLocCoord').textContent=l.lat.toFixed(4)+', '+l.lng.toFixed(4);chkBiz();}
-
-window.saveBiz=async()=>{
-  if(!NW.cfgOk){toast('Firebase 연결 필요');return;}
-  const {collection,addDoc,serverTimestamp}=NW.fb;
-  const menu=parseMenu($('bizMenu').value);
-  const detail={
-    photo:$('bizPhoto').value.trim(), menu, hours:$('bizHours').value.trim(),
-    phone:$('bizPhone').value.trim(),
-    parking:$('bizParking').classList.contains('on'),
-    reservation:$('bizReserv').classList.contains('on')
-  };
-  await addDoc(collection(NW.db,'nw_biz'),{
-    name:$('bizName').value.trim(),cat:bizSel.cat,radius:bizSel.rad,
-    lat:bizLoc.lat,lng:bizLoc.lng,status:'open',
-    approved:false, ownerId:NW.uid, ownerName:NW.user?.displayName||'', ownerEmail:NW.user?.email||'',
-    createdAt:serverTimestamp(),...detail});
-  $('pendName').textContent=`"${$('bizName').value.trim()}" 신청이 접수되었어요.`;
-  subShow('m-pending');
-  toast('매장 신청 완료! 관리자 승인을 기다려 주세요.');
-};
-function parseMenu(txt){
-  return txt.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
-    const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};
-    return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};
-  });
-}
-window.spawnDemo=async()=>{
-  if(!NW.cfgOk){toast('Firebase config를 먼저 설정하세요.');return;}
-  if(!bizLoc){toast('위치를 먼저 확인하세요.');return;}
-  const {collection,addDoc,serverTimestamp}=NW.fb;
-  const base=bizLoc,off=[[0.0012,0.0008],[-0.0009,0.0014],[0.0018,-0.0006]];
-  const demos=[{name:'데모 라운지펍',cat:'pub'},{name:'데모 코인노래방',cat:'karaoke'},{name:'데모 방탈출 강남',cat:'escape'}];
-  for(let i=0;i<demos.length;i++){
-    await addDoc(collection(NW.db,'nw_biz'),{...demos[i],radius:2000,
-      lat:base.lat+off[i][0],lng:base.lng+off[i][1],status:'open',ownerId:'demo',demo:true,
-      menu:NW.DEMO_MENU[demos[i].cat]||[], hours:NW.DEMO_HOURS, phone:'02-1234-567'+i,
-      parking:i!==2, reservation:true, photo:'', createdAt:serverTimestamp()});}
-  toast('데모 매장 3개 생성 완료. 사용자 앱에서 호출해 보세요!');
-};
 
 function openConsole(){
   subShow('m-console');
@@ -375,7 +289,8 @@ window.respond=async(callId,type)=>{
   toast(type==='ok'?'「가능」 응답 전송':type==='soon'?'「10분 후」 응답 전송':'「불가」 응답');
   const un=onSnapshot(doc(NW.db,'nw_calls',callId),s=>{if(!s.exists())return;const d=s.data();
     if(d.status==='matched'&&d.matchedBizId===myBizId){stats.match++;$('tsMatch').textContent=stats.match;toast('🎉 우리 매장이 선택됐어요!');un();}
-    else if(['matched','expired','cancelled','done','noshow'].includes(d.status))un();});
+    else if(d.status==='matched'&&d.matchedBizId!==myBizId){toast('아쉽게도 다른 매장으로 매칭됐어요.');un();}
+    else if(['expired','cancelled','done','noshow'].includes(d.status))un();});
   const el=$('call-'+callId);if(el){const btn=el.querySelector('.resp-row');if(btn)btn.outerHTML='<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>';}
 };
 window.addEventListener('beforeunload',()=>{if(callsUnsub)callsUnsub();if(arrUnsub)arrUnsub();});

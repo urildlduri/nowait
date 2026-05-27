@@ -404,13 +404,29 @@ async function drawMap(b){
 }
 window.closeDetail=()=>{ subShow('u-search'); };
 
+let matching=false;
 window.confirmMatch=async()=>{
   const r=detailResp;if(!r)return;
-  const {doc,updateDoc,serverTimestamp,Timestamp}=NW.fb;
-  const matchExp=Timestamp.fromMillis(nowMs()+MATCH_TTL*1000);
-  await updateDoc(doc(NW.db,'nw_calls',curCallId),{
-    status:'matched',matchedBizId:r.id,matchedBizName:r.bizName,matchedAt:serverTimestamp(),matchExpiresAt:matchExp});
-  matchData={callId:curCallId,...r,biz:detailBiz};cleanupCall();openMatched(nowMs()+MATCH_TTL*1000);
+  if(matching)return;                 // 이중 클릭 방지
+  matching=true;
+  const btn=document.querySelector('#u-detail .cta:not(.ghost)');
+  if(btn){btn.disabled=true;btn.textContent='확정 중…';}
+  try{
+    const {doc,getDoc,updateDoc,serverTimestamp,Timestamp}=NW.fb;
+    // 아직 searching인지 다시 확인 (만료/취소된 호출 방어)
+    const cs=await getDoc(doc(NW.db,'nw_calls',curCallId));
+    if(!cs.exists()||cs.data().status!=='searching'){
+      toast('이미 처리된 호출이에요. 다시 시도해 주세요.');
+      matching=false; cleanupCall(); subShow('u-home'); return;
+    }
+    const matchExp=Timestamp.fromMillis(nowMs()+MATCH_TTL*1000);
+    await updateDoc(doc(NW.db,'nw_calls',curCallId),{
+      status:'matched',matchedBizId:r.id,matchedBizName:r.bizName,matchedAt:serverTimestamp(),matchExpiresAt:matchExp});
+    matchData={callId:curCallId,...r,biz:detailBiz};cleanupCall();openMatched(nowMs()+MATCH_TTL*1000);
+  }catch(e){
+    toast('매칭 실패: '+(e.code||e.message));
+    if(btn){btn.disabled=false;btn.textContent='여기로 갈게요';}
+  }finally{ matching=false; }
 };
 function openMatched(end){const r=matchData,c=catOf(r.cat||sel.cat);
   $('mName').textContent=r.bizName||'매장';

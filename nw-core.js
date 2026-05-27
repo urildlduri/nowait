@@ -310,3 +310,4 @@ NW.myBusiness = async function(){
   const list=snap.docs.map(d=>({id:d.id,...d.data()}));
   return list.find(b=>b.approved)||list[0];
 };
+
