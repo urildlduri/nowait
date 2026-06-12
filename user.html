@@ -198,25 +198,34 @@ function init(){
   });
 }
 
-/* ── 이 주변 핫플 (승인된 매장 중 isHot=true) ── */
+/* ── 이 주변 핫플 (승인된 매장 중 isHot=true, 3km 이내) ── */
+const HOT_RADIUS = 3000; // 3km
 let hotLoaded=false;
 async function loadHotplaces(force){
   if(hotLoaded && !force) return;
   if(!NW.fbLoaded) await NW.fbReady;
   if(!NW.db) return;
   hotLoaded=true;
+  // 위치 없으면 안내
+  if(!myLoc){
+    $('hotList').innerHTML=`<div class="penalty" style="border-color:var(--info);background:var(--infobg)"><div class="pi">📍</div><div><b style="color:var(--info)">위치 정보가 필요해요</b><div class="pt" style="color:var(--info);font-family:inherit;font-weight:600">홈에서 위치를 설정한 뒤 다시 와주세요</div></div></div>`;
+    $('hotMore').textContent='';
+    return;
+  }
   try{
     const {collection,getDocs,query,where}=NW.fb;
     const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('isHot','==',true)));
     let list=snap.docs.map(d=>({id:d.id,...d.data()}));
-    if(myLoc) list.forEach(h=>{ if(h.lat&&h.lng) h._dist=haversine(myLoc,{lat:h.lat,lng:h.lng}); });
-    list.sort((a,b)=>(a._dist??9e9)-(b._dist??9e9));
+    // 3km 이내만 필터 + 거리순
+    list=list.filter(h=>h.lat&&h.lng).map(h=>{
+      h._dist=haversine(myLoc,{lat:h.lat,lng:h.lng});return h;
+    }).filter(h=>h._dist<=HOT_RADIUS).sort((a,b)=>a._dist-b._dist);
     renderHot(list);
-  }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">아직 등록된 핫플이 없어요.</div>'; }
+  }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">핫플을 불러오지 못했어요.</div>'; }
 }
 function renderHot(list){
-  if(!list.length){$('hotList').innerHTML='<div class="muted" style="font-size:13px">아직 등록된 핫플이 없어요.</div>';return;}
-  $('hotMore').textContent=list.length+'곳';
+  if(!list.length){$('hotList').innerHTML='<div class="muted" style="font-size:13px">3km 이내에 등록된 핫플이 없어요.</div>';$('hotMore').textContent='';return;}
+  $('hotMore').textContent=`${list.length}곳 · 3km 이내`;
   $('hotList').innerHTML=list.map(h=>{
     const cat=catOf(h.cat);
     const dist=h._dist!=null?distLabel(h._dist):'';
