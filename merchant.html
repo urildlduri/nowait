@@ -37,6 +37,7 @@
     <div style="display:flex;align-items:center;gap:16px">
       <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
       <button class="adm-btn" style="padding:8px 12px;font-size:12px" onclick="openEdit()">⚙ 매장 수정</button>
+      <button class="adm-btn" id="alarmBtn" style="padding:8px 12px;font-size:12px" onclick="toggleAlarm()">🔔 알람 OFF</button>
       <button class="adm-btn hide" id="memBtn" style="padding:8px 12px;font-size:12px" onclick="openMembers()">👥 직원</button>
       <div id="acct"></div>
     </div>
@@ -320,13 +321,99 @@ function listenCalls(){
   },err=>{ console.error('[listenCalls] 쿼리 오류:',err); toast('호출 수신 오류: '+(err.code||err.message)); });
 }
 function renderCalls(list){
-  list.forEach(c=>{if(!stats._seen.has(c.id)){stats._seen.add(c.id);stats.calls++;}});
+  let newCount=0;
+  list.forEach(c=>{if(!stats._seen.has(c.id)){stats._seen.add(c.id);stats.calls++;newCount++;}});
+  if(newCount>0) fireAlarm(newCount);
   $('tsCalls').textContent=stats.calls;$('tsResp').textContent=stats.resp;$('tsMatch').textContent=stats.match;
   const area=$('callsArea');
   if(myBiz.status==='closed'){area.innerHTML='<div class="standby"><div class="big">🔴</div><h3>마감 상태</h3><p>마감 중에는 호출을 받지 않습니다.</p></div>';return;}
   if(list.length===0){area.innerHTML=`<div class="standby"><div class="big">📡</div><h3>호출 대기 중</h3><p>반경 안에서 호출이 오면 즉시 표시됩니다.</p><div class="pin">${myBiz.lat.toFixed(4)}, ${myBiz.lng.toFixed(4)}</div></div>`;return;}
   area.innerHTML='<div class="calls-grid">'+list.sort((a,b)=>a._dist-b._dist).map(callCard).join('')+'</div>';
   list.forEach(c=>startCallTimer(c.id,tsMs(c.expiresAt)));
+}
+
+/* ── 알람 시스템 ── 소리 + 브라우저 알림 + 탭 제목 깜빡임 + 진동 */
+let alarmOn=false, titleBlinkTimer=null, audioCtx=null, firstLoad=true;
+const ORIG_TITLE=document.title;
+
+window.toggleAlarm=async()=>{
+  alarmOn=!alarmOn;
+  const btn=$('alarmBtn');
+  if(alarmOn){
+    btn.style.color='var(--y)'; btn.style.borderColor='var(--y)';
+    btn.textContent='🔔 알람 ON';
+    // 사용자 제스처 안에서 오디오 컨텍스트 활성화 (자동재생 정책 회피)
+    try{
+      if(!audioCtx){
+        const AC=window.AudioContext||window.webkitAudioContext;
+        if(AC) audioCtx=new AC();
+      }
+      if(audioCtx && audioCtx.state==='suspended') await audioCtx.resume();
+    }catch(e){}
+    // 브라우저 알림 권한
+    if('Notification' in window && Notification.permission==='default'){
+      try{ await Notification.requestPermission(); }catch(e){}
+    }
+    toast('🔔 알람 켜짐 (소리·알림·진동)');
+  }else{
+    btn.style.color=''; btn.style.borderColor='';
+    btn.textContent='🔔 알람 OFF';
+    stopTitleBlink();
+    toast('🔕 알람 꺼짐');
+  }
+};
+
+function fireAlarm(count){
+  // 첫 로드(기존 호출이 잡힐 때)는 알람 안 울림
+  if(firstLoad){ firstLoad=false; return; }
+  if(!alarmOn) return;
+  playBeep();
+  blinkTitle(count);
+  showNotification(count);
+  vibrate();
+}
+function playBeep(){
+  if(!audioCtx) return;
+  try{
+    // 띵-동: 880Hz 짧게, 660Hz 짧게
+    const now=audioCtx.currentTime;
+    [[880,now,0.18],[660,now+0.22,0.22]].forEach(([f,t,d])=>{
+      const osc=audioCtx.createOscillator(), gain=audioCtx.createGain();
+      osc.type='sine'; osc.frequency.value=f;
+      gain.gain.setValueAtTime(0,t);
+      gain.gain.linearRampToValueAtTime(0.35,t+0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001,t+d);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t); osc.stop(t+d);
+    });
+  }catch(e){}
+}
+function blinkTitle(count){
+  stopTitleBlink();
+  let on=true;
+  titleBlinkTimer=setInterval(()=>{
+    document.title = on?`🔔 호출 ${count}건 — ${ORIG_TITLE}`:ORIG_TITLE;
+    on=!on;
+  },800);
+  // 사용자가 탭에 포커스하면 제목 복원
+  const restore=()=>{ stopTitleBlink(); window.removeEventListener('focus',restore); document.removeEventListener('visibilitychange',vis); };
+  const vis=()=>{ if(document.visibilityState==='visible') restore(); };
+  window.addEventListener('focus',restore);
+  document.addEventListener('visibilitychange',vis);
+}
+function stopTitleBlink(){ if(titleBlinkTimer){clearInterval(titleBlinkTimer);titleBlinkTimer=null;} document.title=ORIG_TITLE; }
+function showNotification(count){
+  if(!('Notification' in window) || Notification.permission!=='granted') return;
+  try{
+    const n=new Notification('NOWAIT — 새 호출',{
+      body:`${count}건의 새 호출이 도착했어요`,
+      tag:'nw-call', renotify:true, requireInteraction:false
+    });
+    n.onclick=()=>{ window.focus(); n.close(); };
+  }catch(e){}
+}
+function vibrate(){
+  if(navigator.vibrate) try{ navigator.vibrate([220,120,220]); }catch(e){}
 }
 function callCard(c){const cat=catOf(c.cat);const done=respondedCalls.has(c.id);let action;
   if(done)action=`<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>`;
