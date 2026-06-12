@@ -301,13 +301,22 @@ NW.guardPage = function(want, onOk){
   });
 };
 
-/* 내 매장 조회 (승인된 것 우선). 반환 {id,...} 또는 null */
+/* 내 매장 조회: ownerId 본인이거나 memberEmails에 본인 이메일 포함된 매장.
+   여러 개면 승인된 것 우선. */
 NW.myBusiness = async function(){
   if(!NW.uid) return null;
   const {collection,query,where,getDocs}=NW.fb;
-  const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('ownerId','==',NW.uid)));
-  if(snap.empty) return null;
-  const list=snap.docs.map(d=>({id:d.id,...d.data()}));
+  const [byOwner, byMember] = await Promise.all([
+    getDocs(query(collection(NW.db,'nw_biz'),where('ownerId','==',NW.uid))).catch(()=>({docs:[]})),
+    NW.user?.email
+      ? getDocs(query(collection(NW.db,'nw_biz'),where('memberEmails','array-contains',NW.user.email))).catch(()=>({docs:[]}))
+      : Promise.resolve({docs:[]})
+  ]);
+  const map=new Map();
+  byOwner.docs.forEach(d=>map.set(d.id,{id:d.id,...d.data(),_role:'owner'}));
+  byMember.docs.forEach(d=>{ if(!map.has(d.id)) map.set(d.id,{id:d.id,...d.data(),_role:'member'}); });
+  const list=[...map.values()];
+  if(!list.length) return null;
   return list.find(b=>b.approved)||list[0];
 };
 

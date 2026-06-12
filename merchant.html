@@ -37,6 +37,7 @@
     <div style="display:flex;align-items:center;gap:16px">
       <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
       <button class="adm-btn" style="padding:8px 12px;font-size:12px" onclick="openEdit()">⚙ 매장 수정</button>
+      <button class="adm-btn hide" id="memBtn" style="padding:8px 12px;font-size:12px" onclick="openMembers()">👥 직원</button>
       <div id="acct"></div>
     </div>
   </div>
@@ -96,6 +97,22 @@
     <button class="cta ghost" style="margin-top:10px" onclick="subShow('m-console')">취소</button>
   </div>
 </div>
+
+<!-- 직원 관리 -->
+<div id="m-members" class="scr">
+  <div class="setup">
+    <div style="margin-bottom:8px"><button class="back" onclick="subShow('m-console')" style="background:none;color:var(--tx2);font-weight:700">← 콘솔로</button></div>
+    <div class="brand" style="font-size:30px">직원 관리</div>
+    <div class="brand-sub" style="text-align:left;margin-top:8px">직원의 <b>구글 이메일</b>을 추가하면 같은 매장 콘솔을 공유할 수 있어요.</div>
+    <div class="field"><div class="field-lb">직원 이메일 추가</div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="memEmail" type="email" placeholder="staff@gmail.com" style="margin:0;flex:1">
+        <button class="cta" style="margin:0;padding:14px 18px;font-size:14px" onclick="addMember()">추가</button>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:6px">반드시 그 직원이 <b>구글 로그인에 사용하는</b> 정확한 이메일이어야 해요.</div></div>
+    <div class="field"><div class="field-lb">현재 멤버</div><div id="memList"></div></div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script src="nw-core.js"></script>
@@ -136,8 +153,46 @@ function openConsole(){
   $('cBizCat').textContent=catOf(myBiz.cat).e+' '+catOf(myBiz.cat).n+' · 반경 '+distLabel(myBiz.radius);
   const pin=$('cBizPin'); if(pin) pin.textContent=myBiz.lat.toFixed(4)+', '+myBiz.lng.toFixed(4);
   const p2=$('cBizPin2'); if(p2) p2.textContent=myBiz.lat.toFixed(5)+', '+myBiz.lng.toFixed(5)+' · 반경 '+distLabel(myBiz.radius);
+  // 직원 관리 버튼은 오너에게만 보임
+  const memBtn=$('memBtn');
+  if(memBtn) memBtn.classList.toggle('hide', myBiz.ownerId!==NW.uid);
   setBizStatus(myBiz.status,true); listenCalls(); listenArrivals();
 }
+
+/* ── 직원(멤버) 관리 ── 오너만 */
+window.openMembers=()=>{
+  if(myBiz.ownerId!==NW.uid){ toast('오너만 직원을 관리할 수 있어요'); return; }
+  subShow('m-members'); renderMembers();
+};
+function renderMembers(){
+  const list=myBiz.memberEmails||[];
+  if(!list.length){$('memList').innerHTML='<div class="muted" style="font-size:13px">아직 등록된 직원이 없어요.</div>';return;}
+  $('memList').innerHTML=list.map(em=>`
+    <div class="hist-item"><div class="hi-l"><b>${em}</b></div>
+    <button class="adm-btn danger" style="padding:6px 10px" onclick="removeMember('${em}')">제거</button></div>`).join('');
+}
+window.addMember=async()=>{
+  const em=$('memEmail').value.trim().toLowerCase();
+  if(!em||!em.includes('@')){toast('올바른 이메일을 입력하세요');return;}
+  if(em===NW.user?.email){toast('오너 본인은 추가할 필요 없어요');return;}
+  const list=myBiz.memberEmails||[];
+  if(list.includes(em)){toast('이미 추가된 이메일이에요');return;}
+  const next=[...list,em];
+  const {doc,updateDoc}=NW.fb;
+  try{
+    await updateDoc(doc(NW.db,'nw_biz',myBizId),{memberEmails:next});
+    myBiz.memberEmails=next; $('memEmail').value=''; toast('직원 추가 완료'); renderMembers();
+  }catch(e){toast('실패: '+e.message);}
+};
+window.removeMember=async(em)=>{
+  if(!confirm(`"${em}" 직원을 제거할까요?`))return;
+  const next=(myBiz.memberEmails||[]).filter(x=>x!==em);
+  const {doc,updateDoc}=NW.fb;
+  try{
+    await updateDoc(doc(NW.db,'nw_biz',myBizId),{memberEmails:next});
+    myBiz.memberEmails=next; toast('제거 완료'); renderMembers();
+  }catch(e){toast('실패: '+e.message);}
+};
 
 /* ── 매장 정보 수정 ── */
 let eSel={cat:null,rad:1000}, eMap=null, eMarker=null;
@@ -283,7 +338,9 @@ window.respond=async(callId,type)=>{
   const cs=await getDoc(doc(NW.db,'nw_calls',callId));
   if(!cs.exists()||cs.data().status!=='searching'){toast('이미 마감된 호출이에요.');return;}
   const cd=cs.data();const realDist=haversine(myBiz,{lat:cd.lat,lng:cd.lng});
-  await setDoc(doc(NW.db,'nw_calls',callId,'responses',myBizId),{bizId:myBizId,bizName:myBiz.name,cat:myBiz.cat,type,dist:realDist,at:serverTimestamp()});
+  await setDoc(doc(NW.db,'nw_calls',callId,'responses',myBizId),{bizId:myBizId,bizName:myBiz.name,cat:myBiz.cat,type,dist:realDist,
+    responderUid:NW.uid, responderName:NW.user?.displayName||'', responderEmail:NW.user?.email||'',
+    at:serverTimestamp()});
   respondedCalls.add(callId);
   if(type!=='no'){stats.resp++;$('tsResp').textContent=stats.resp;}
   toast(type==='ok'?'「가능」 응답 전송':type==='soon'?'「10분 후」 응답 전송':'「불가」 응답');

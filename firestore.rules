@@ -22,9 +22,15 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.approved == false;
+      // 수정: 관리자 / 오너 / 멤버(자기 이메일이 memberEmails에 포함). approved 플래그는 관리자만.
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerId == request.auth.uid
-            && request.resource.data.approved == resource.data.approved);
+            && request.resource.data.approved == resource.data.approved)
+        || (signedIn() && resource.data.memberEmails is list
+            && request.auth.token.email in resource.data.memberEmails
+            && request.resource.data.ownerId == resource.data.ownerId
+            && request.resource.data.approved == resource.data.approved
+            && request.resource.data.memberEmails == resource.data.memberEmails);
       allow delete: if isAdmin();
     }
 
