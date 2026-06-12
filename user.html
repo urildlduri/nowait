@@ -33,10 +33,6 @@
       </div>
       <div id="penaltyBanner"></div>
       <button class="cta" id="callBtn" onclick="startCall()" disabled>지금 호출하기</button>
-      <div class="sec-divider"></div>
-      <div class="h2" style="display:flex;align-items:center;justify-content:space-between">
-        🔥 이 주변 핫플 <span id="hotMore" class="muted" style="font-size:12px;font-weight:600"></span></div>
-      <div id="hotList"><div class="muted" style="font-size:13px">주변 핫플을 불러오는 중…</div></div>
     </div>
   </div>
 
@@ -127,8 +123,18 @@
     </div>
   </div>
 
+  <!-- 주변 핫플 -->
+  <div id="u-hot" class="scr">
+    <div class="page">
+      <div class="h1">🔥 이 주변 핫플</div>
+      <div class="muted" style="margin-top:8px">관리자가 추천하는 동네 핫플 모음 <span id="hotMore" style="font-weight:700;color:var(--y)"></span></div>
+      <div id="hotList" style="margin-top:18px"><div class="muted" style="font-size:13px">주변 핫플을 불러오는 중…</div></div>
+    </div>
+  </div>
+
   <div class="bnav">
     <button id="n-home" class="on" onclick="uGo('u-home','n-home')"><span class="bi">🔍</span>호출</button>
+    <button id="n-hot" onclick="uGo('u-hot','n-hot')"><span class="bi">🔥</span>핫플</button>
     <button id="n-partner" onclick="uGo('u-partner','n-partner')"><span class="bi">🏪</span>파트너</button>
     <button id="n-my" onclick="uGo('u-my','n-my')"><span class="bi">👤</span>MY</button>
   </div>
@@ -146,10 +152,10 @@ function subShow(id){
   $(id).classList.add('on');
   // 하단 탭은 메인 화면(홈/파트너/MY)에서만 표시. 상세·매칭·탐색 화면에선 숨김.
   const bnav=document.querySelector('.bnav');
-  if(bnav){ const mainScreens=['u-home','u-partner','u-my']; bnav.style.display = mainScreens.includes(id)?'flex':'none'; }
+  if(bnav){ const mainScreens=['u-home','u-hot','u-partner','u-my']; bnav.style.display = mainScreens.includes(id)?'flex':'none'; }
   window.scrollTo(0,0);
 }
-window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();if(id==='u-home')loadHotplaces();};
+window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();if(id==='u-hot')loadHotplaces(true);};
 
 function init(){
   buildChips(); getLoc();
@@ -172,8 +178,8 @@ function init(){
 
 /* ── 이 주변 핫플 (관리자가 nw_hotplaces에 등록) ── */
 let hotLoaded=false;
-async function loadHotplaces(){
-  if(hotLoaded) return; // 한 번만
+async function loadHotplaces(force){
+  if(hotLoaded && !force) return;
   if(!NW.fbLoaded) await NW.fbReady;
   if(!NW.db) return;
   hotLoaded=true;
