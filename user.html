@@ -22,7 +22,7 @@
       <div class="h1">지금 우리,<br>갈 수 있는 곳?</div>
       <div class="muted" style="margin-top:8px">인원과 업종만 고르면 30초 안에 답이 와요.</div>
       <div class="field"><div class="field-lb">몇 명이세요?</div><div class="chips" id="partyChips"></div></div>
-      <div class="field"><div class="field-lb">어디 가요?</div><div class="chips" id="catChips"></div></div>
+      <div class="field"><div class="field-lb">어디 가요? <span style="color:var(--tx3);font-weight:500">(여러 개 선택 가능)</span></div><div class="chips" id="catChips"></div></div>
       <div class="locbox"><div class="pin">📍</div>
         <div class="txt"><b id="locName">위치 확인 중…</b><small id="locCoord">--</small></div>
         <button onclick="getLoc()">새로고침</button></div>
@@ -144,7 +144,7 @@
 <script src="nw-core.js"></script>
 <script>
 const {$,toast,fmtT,haversine,distLabel,nowMs,tsMs,catOf,CATS,PARTY,CALL_TTL,MATCH_TTL,PENALTY,FALLBACK}=NW;
-let myLoc=null, sel={party:null,cat:null};
+let myLoc=null, sel={party:null,cats:[]};
 let curCallId=null, callUnsub=null, callTimer=null, matchTimer=null, responses=[];
 
 function subShow(id){
@@ -219,8 +219,13 @@ function buildChips(){
   $('catChips').innerHTML=CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
 }
 window.pickParty=p=>{sel.party=p;document.querySelectorAll('#partyChips .chip').forEach(b=>b.classList.toggle('on',+b.dataset.p===p));chkReady();};
-window.pickCat=k=>{sel.cat=k;document.querySelectorAll('#catChips .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));chkReady();};
-function chkReady(){$('callBtn').disabled=!(sel.party&&sel.cat&&myLoc&&NW.cfgOk&&!penalActive());}
+window.pickCat=k=>{
+  const i=sel.cats.indexOf(k);
+  if(i>=0) sel.cats.splice(i,1); else sel.cats.push(k);
+  document.querySelectorAll('#catChips .chip').forEach(b=>b.classList.toggle('on',sel.cats.includes(b.dataset.c)));
+  chkReady();
+};
+function chkReady(){$('callBtn').disabled=!(sel.party&&sel.cats.length&&myLoc&&NW.cfgOk&&!penalActive());}
 
 window.getLoc=async()=>{
   $('locName').textContent='위치 확인 중…';$('locCoord').textContent='--';
@@ -270,11 +275,13 @@ function renderPenaltyBanner(){
 window.startCall=async()=>{
   if(!NW.cfgOk){toast('Firebase config를 먼저 설정하세요.');return;}
   if(penalActive()){toast('패널티 적용 중입니다.');return;}
-  if(!(sel.party&&sel.cat&&myLoc))return;
+  if(!(sel.party&&sel.cats.length&&myLoc))return;
   const {collection,addDoc,serverTimestamp,Timestamp}=NW.fb;
   const expires=Timestamp.fromMillis(nowMs()+CALL_TTL*1000);
   const ref=await addDoc(collection(NW.db,'nw_calls'),{
-    callerId:NW.uid, party:sel.party, cat:sel.cat, lat:myLoc.lat, lng:myLoc.lng,
+    callerId:NW.uid, party:sel.party,
+    cats:sel.cats, cat:sel.cats[0],   // 다중 + 구버전 호환
+    lat:myLoc.lat, lng:myLoc.lng,
     status:'searching', createdAt:serverTimestamp(), expiresAt:expires});
   curCallId=ref.id; subShow('u-search');
   $('resList').innerHTML=''; $('srCount').textContent='0';
@@ -287,17 +294,18 @@ window.startCall=async()=>{
 async function autoRespondDemo(callId){
   try{
     const {collection,query,where,getDocs,doc,setDoc,serverTimestamp}=NW.fb;
-    const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('cat','==',sel.cat)));
+    const cats=sel.cats.slice();
+    // 'in' 쿼리는 최대 10개, 우리 cats는 최대 9개라 안전
+    const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('cat','in',cats)));
     const demos=snap.docs.map(d=>({id:d.id,...d.data()}))
       .filter(b=>b.demo && b.approved!==false);
     demos.forEach(b=>{
-      if(sel.party < (b.minParty||1)) return;   // 최소 인원 미달
+      if(sel.party < (b.minParty||1)) return;
       const dist=haversine(myLoc,{lat:b.lat,lng:b.lng});
-      if(dist>(b.radius||2000)) return;       // 반경 밖이면 응답 안 함
+      if(dist>(b.radius||2000)) return;
       const type=Math.random()<0.75?'ok':'soon';
-      const delay=800+Math.random()*2500;     // 0.8~3.3초
+      const delay=800+Math.random()*2500;
       setTimeout(async()=>{
-        // 호출이 아직 살아있을 때만
         if(curCallId!==callId) return;
         await setDoc(doc(NW.db,'nw_calls',callId,'responses',b.id),{
           bizId:b.id, bizName:b.name, cat:b.cat, type, dist, at:serverTimestamp()
@@ -336,7 +344,7 @@ function renderResponses(){
   h+=list.map(card).join('');
   $('resList').innerHTML=h;
 }
-function card(r){const c=catOf(r.cat||sel.cat);
+function card(r){const c=catOf(r.cat||sel.cats[0]);
   const badge=r.type==='ok'?'<span class="badge bd-ok">지금 가능</span>':'<span class="badge bd-soon">10분 후</span>';
   return `<div class="bizcard" onclick="openDetail('${r.id}')"><div class="em">${c.e}</div>
     <div class="info"><b>${r.bizName||'매장'}</b><div class="meta">${distLabel(r.dist)} · ${c.n}</div></div>${badge}</div>`;}
@@ -366,7 +374,7 @@ let matchData=null, detailResp=null, detailBiz=null;
 window.openDetail=async(respId)=>{
   const r=responses.find(x=>x.id===respId);if(!r)return;
   detailResp=r;
-  const c=catOf(r.cat||sel.cat);
+  const c=catOf(r.cat||sel.cats[0]);
   // 매장 상세 문서 로드
   let b={};
   try{const {doc,getDoc}=NW.fb;const s=await getDoc(doc(NW.db,'nw_biz',r.id));if(s.exists())b=s.data();}catch(e){}
@@ -449,7 +457,7 @@ window.confirmMatch=async()=>{
     if(btn){btn.disabled=false;btn.textContent='여기로 갈게요';}
   }finally{ matching=false; }
 };
-function openMatched(end){const r=matchData,c=catOf(r.cat||sel.cat);
+function openMatched(end){const r=matchData,c=catOf(r.cat||sel.cats[0]);
   $('mName').textContent=r.bizName||'매장';
   $('mSub').textContent=r.type==='ok'?'지금 바로 입장 가능합니다':'약 10분 후 입장 가능합니다';
   const b=r.biz||{};
@@ -497,7 +505,7 @@ async function noShow(){
 async function saveHist(status){if(!NW.uid)return;
   const {collection,addDoc,serverTimestamp}=NW.fb;
   await addDoc(collection(NW.db,'nw_users',NW.uid,'history'),{
-    bizName:matchData?.bizName||'-',cat:sel.cat,party:sel.party,status,at:serverTimestamp()}).catch(()=>{});}
+    bizName:matchData?.bizName||'-',cat:sel.cats[0],party:sel.party,status,at:serverTimestamp()}).catch(()=>{});}
 async function renderMy(){
   renderPenaltyBannerMy();
   if(!NW.uid){$('myHist').innerHTML='<div class="muted">로컬 모드</div>';return;}

@@ -302,7 +302,8 @@ window.setBizStatus=async(s,silent)=>{
 function listenCalls(){
   const {collection,query,where,onSnapshot}=NW.fb;
   // 단일 where(cat)만 사용 → 복합 인덱스 불필요. status는 클라이언트에서 필터.
-  const q=query(collection(NW.db,'nw_calls'),where('cat','==',myBiz.cat));
+  // 새 호출은 cats[] 배열로 저장됨. array-contains로 매칭. (구 호출도 cat=cats[0]이라 별도 처리 X)
+  const q=query(collection(NW.db,'nw_calls'),where('cats','array-contains',myBiz.cat));
   callsUnsub=onSnapshot(q,snap=>{
     const list=[];
     snap.forEach(d=>{const c={id:d.id,...d.data()};
