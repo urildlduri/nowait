@@ -134,7 +134,7 @@
 
   <!-- 핫플 매장 상세 -->
   <div id="u-hotdetail" class="scr">
-    <div class="page" style="padding-bottom:30px">
+    <div class="page" style="padding-bottom:100px">
       <button class="back" onclick="closeHotDetail()" style="background:none;color:var(--tx2);font-weight:700;font-size:14px;margin-bottom:14px">← 핫플 목록</button>
       <div id="hd-photo"></div>
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:16px">
@@ -174,7 +174,7 @@ function subShow(id){
   $(id).classList.add('on');
   // 하단 탭은 메인 화면(홈/파트너/MY)에서만 표시. 상세·매칭·탐색 화면에선 숨김.
   const bnav=document.querySelector('.bnav');
-  if(bnav){ const mainScreens=['u-home','u-hot','u-partner','u-my']; bnav.style.display = mainScreens.includes(id)?'flex':'none'; }
+  if(bnav){ const mainScreens=['u-home','u-hot','u-hotdetail','u-partner','u-my']; bnav.style.display = mainScreens.includes(id)?'flex':'none'; }
   window.scrollTo(0,0);
 }
 window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();if(id==='u-hot')loadHotplaces(true);};
