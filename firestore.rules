@@ -22,7 +22,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.approved == false;
-      // 수정: 관리자 / 오너 / 멤버(자기 이메일이 memberEmails에 포함). approved 플래그는 관리자만.
+      // 수정: 관리자 / 오너 / 멤버 / 또는 평점 필드만 갱신(리뷰 작성·삭제 시)
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerId == request.auth.uid
             && request.resource.data.approved == resource.data.approved)
@@ -30,13 +30,20 @@ service cloud.firestore {
             && request.auth.token.email in resource.data.memberEmails
             && request.resource.data.ownerId == resource.data.ownerId
             && request.resource.data.approved == resource.data.approved
-            && request.resource.data.memberEmails == resource.data.memberEmails);
+            && request.resource.data.memberEmails == resource.data.memberEmails)
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['ratingAvg','ratingCount']));
       allow delete: if isAdmin();
     }
 
-    match /nw_hotplaces/{id} {
+    // 리뷰 (1매장 1사용자 — 문서 id가 bizId_uid)
+    match /nw_reviews/{rid} {
       allow read: if signedIn();
-      allow write: if isAdmin();
+      allow create, update: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
     }
 
     match /nw_calls/{id} {

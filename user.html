@@ -132,6 +132,28 @@
     </div>
   </div>
 
+  <!-- 핫플 매장 상세 -->
+  <div id="u-hotdetail" class="scr">
+    <div class="page" style="padding-bottom:30px">
+      <button class="back" onclick="closeHotDetail()" style="background:none;color:var(--tx2);font-weight:700;font-size:14px;margin-bottom:14px">← 핫플 목록</button>
+      <div id="hd-photo"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:16px">
+        <div><div class="h1" id="hd-name" style="font-size:22px">매장</div>
+          <div class="muted mono" id="hd-meta" style="margin-top:6px">--</div></div>
+        <div id="hd-rating"></div>
+      </div>
+      <div id="hd-map" style="width:100%;height:200px;border-radius:var(--rad);margin-top:18px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
+      <a id="hd-route" class="cta ghost" style="margin-top:10px;display:block;text-align:center" target="_blank" rel="noopener">🧭 카카오맵 길찾기</a>
+      <div id="hd-contact"></div>
+      <div id="hd-menu"></div>
+      <div id="hd-info"></div>
+      <div class="sec-divider"></div>
+      <div class="h2">리뷰</div>
+      <div id="hd-myreview"></div>
+      <div id="hd-reviews"><div class="muted" style="font-size:13px">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요.</div></div>
+    </div>
+  </div>
+
   <div class="bnav">
     <button id="n-home" class="on" onclick="uGo('u-home','n-home')"><span class="bi">🔍</span>호출</button>
     <button id="n-hot" onclick="uGo('u-hot','n-hot')"><span class="bi">🔥</span>핫플</button>
@@ -176,7 +198,7 @@ function init(){
   });
 }
 
-/* ── 이 주변 핫플 (관리자가 nw_hotplaces에 등록) ── */
+/* ── 이 주변 핫플 (승인된 매장 중 isHot=true) ── */
 let hotLoaded=false;
 async function loadHotplaces(force){
   if(hotLoaded && !force) return;
@@ -184,14 +206,11 @@ async function loadHotplaces(force){
   if(!NW.db) return;
   hotLoaded=true;
   try{
-    const {collection,getDocs,query,orderBy}=NW.fb;
-    let snap;
-    try{ snap=await getDocs(query(collection(NW.db,'nw_hotplaces'),orderBy('order','asc'))); }
-    catch(e){ snap=await getDocs(collection(NW.db,'nw_hotplaces')); }
+    const {collection,getDocs,query,where}=NW.fb;
+    const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('isHot','==',true)));
     let list=snap.docs.map(d=>({id:d.id,...d.data()}));
-    // 위치 있으면 거리순 정렬
     if(myLoc) list.forEach(h=>{ if(h.lat&&h.lng) h._dist=haversine(myLoc,{lat:h.lat,lng:h.lng}); });
-    list.sort((a,b)=>(a._dist??9e9)-(b._dist??9e9)||(a.order??0)-(b.order??0));
+    list.sort((a,b)=>(a._dist??9e9)-(b._dist??9e9));
     renderHot(list);
   }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">아직 등록된 핫플이 없어요.</div>'; }
 }
@@ -199,19 +218,200 @@ function renderHot(list){
   if(!list.length){$('hotList').innerHTML='<div class="muted" style="font-size:13px">아직 등록된 핫플이 없어요.</div>';return;}
   $('hotMore').textContent=list.length+'곳';
   $('hotList').innerHTML=list.map(h=>{
+    const cat=catOf(h.cat);
     const dist=h._dist!=null?distLabel(h._dist):'';
-    const tag=h.tag?`<span class="badge bd-soon" style="background:var(--infobg);color:var(--info)">${h.tag}</span>`:'';
+    const rating=h.ratingAvg?`<span style="color:var(--y)">⭐ ${(+h.ratingAvg).toFixed(1)}</span>`:'';
     const img=h.photo
-      ? `<img src="${h.photo}" style="width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0">`
-      : `<div class="em" style="width:64px;height:64px;font-size:28px">${h.emoji||'🔥'}</div>`;
-    const link=h.lat&&h.lng?NW.kakaoRoute(h.name,h.lat,h.lng):(h.link||'#');
-    return `<a href="${link}" target="_blank" rel="noopener" class="bizcard" style="align-items:flex-start">
+      ? `<img src="${h.photo}" style="width:72px;height:72px;border-radius:10px;object-fit:cover;flex-shrink:0">`
+      : `<div class="em" style="width:72px;height:72px;font-size:32px">${cat.e}</div>`;
+    return `<div class="bizcard" style="align-items:flex-start;cursor:pointer" onclick="openHotDetail('${h.id}')">
       ${img}
-      <div class="info"><b>${h.name||'핫플'}</b>
-        <div class="meta" style="white-space:normal;font-family:inherit;color:var(--tx2);margin-top:4px">${h.desc||''}</div>
-        <div style="margin-top:8px;display:flex;gap:6px;align-items:center">${tag}${dist?`<span class="meta">${dist}</span>`:''}</div>
-      </div></a>`;
+      <div class="info"><b>${h.name||'매장'}</b>
+        <div class="meta" style="white-space:normal;font-family:inherit;color:var(--tx2);margin-top:4px">${cat.n}${h.hours?' · '+h.hours:''}</div>
+        <div style="margin-top:6px;display:flex;gap:8px;align-items:center;font-size:12px">${rating}${dist?`<span class="meta">${dist}</span>`:''}</div>
+      </div></div>`;
   }).join('');
+}
+
+window.openHotDetail=async(bizId)=>{
+  try{
+    const {doc,getDoc}=NW.fb;
+    const s=await getDoc(doc(NW.db,'nw_biz',bizId));
+    if(!s.exists()){toast('매장을 찾을 수 없어요');return;}
+    const b=s.data();
+    showHotDetail({id:bizId,...b});
+  }catch(e){toast('불러오기 실패: '+e.message);}
+};
+
+let curHotBiz=null;
+function showHotDetail(b){
+  curHotBiz=b;
+  subShow('u-hotdetail');
+  const cat=catOf(b.cat);
+  // 사진
+  $('hd-photo').innerHTML = b.photo
+    ? `<img src="${b.photo}" style="width:100%;height:200px;object-fit:cover;border-radius:var(--rad)" onerror="this.parentNode.innerHTML='${hotPhotoFallback(cat)}'">`
+    : hotPhotoFallback(cat);
+  $('hd-name').textContent=b.name||'매장';
+  const dist=myLoc&&b.lat&&b.lng?' · '+distLabel(haversine(myLoc,{lat:b.lat,lng:b.lng})):'';
+  $('hd-meta').textContent=`${cat.e} ${cat.n}${dist}`;
+  // 별점
+  if(b.ratingAvg){
+    $('hd-rating').innerHTML=`<div style="text-align:right"><div style="color:var(--y);font-size:18px;font-weight:800">⭐ ${(+b.ratingAvg).toFixed(1)}</div><div style="color:var(--tx3);font-size:11px">리뷰 ${b.ratingCount||0}개</div></div>`;
+  }else{
+    $('hd-rating').innerHTML=`<div style="color:var(--tx3);font-size:12px">아직 별점 없음</div>`;
+  }
+  // 길찾기
+  if(b.lat&&b.lng)$('hd-route').href=NW.kakaoRoute(b.name,b.lat,b.lng);
+  else $('hd-route').classList.add('hide');
+  // 연락처 / 홈페이지
+  const contact=[];
+  if(b.phone) contact.push(`<div class="row"><span>전화</span><b><a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a></b></div>`);
+  if(b.website) contact.push(`<div class="row"><span>홈페이지</span><b><a href="${b.website}" target="_blank" rel="noopener" style="color:var(--y)">바로가기 →</a></b></div>`);
+  $('hd-contact').innerHTML=contact.length?`<div class="bizdetail" style="margin-top:18px">${contact.join('')}</div>`:'';
+  // 메뉴
+  if(b.menu&&b.menu.length){
+    $('hd-menu').innerHTML=`<div class="h2" style="margin-top:24px">메뉴</div><div class="bizdetail">`+
+      b.menu.map(m=>`<div class="row"><span style="color:var(--tx)">${m.name}</span><b>${m.price?m.price.toLocaleString()+'원':'-'}</b></div>`).join('')+`</div>`;
+  }else $('hd-menu').innerHTML='';
+  // 영업정보
+  const info=[];
+  if(b.hours) info.push(['영업시간',b.hours]);
+  info.push(['주차',b.parking?'가능':'정보없음']);
+  info.push(['예약',b.reservation?'가능':'정보없음']);
+  $('hd-info').innerHTML=`<div class="h2" style="margin-top:24px">영업정보</div><div class="bizdetail">`+
+    info.map(r=>`<div class="row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')+`</div>`;
+  // 지도
+  drawHotMap(b);
+  // 리뷰
+  loadHotReviews(b.id);
+}
+function hotPhotoFallback(c){return `<div style="width:100%;height:200px;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:72px">${c.e}</div>`;}
+async function drawHotMap(b){
+  const box=$('hd-map');
+  if(!b.lat||!b.lng){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:13px">위치 정보 없음</div>';return;}
+  try{
+    const kakao=await NW.loadKakao();
+    box.innerHTML='';
+    const center=new kakao.maps.LatLng(b.lat,b.lng);
+    const map=new kakao.maps.Map(box,{center,level:4});
+    new kakao.maps.Marker({map,position:center});
+    if(myLoc){
+      const me=new kakao.maps.LatLng(myLoc.lat,myLoc.lng);
+      new kakao.maps.Marker({map,position:me,
+        image:new kakao.maps.MarkerImage('data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22"><circle cx="11" cy="11" r="7" fill="#4D9FFF" stroke="#fff" stroke-width="3"/></svg>'),new kakao.maps.Size(22,22))});
+      const bounds=new kakao.maps.LatLngBounds();bounds.extend(center);bounds.extend(me);map.setBounds(bounds);
+    }
+  }catch(e){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:12px;text-align:center;padding:10px">지도를 불러올 수 없어요</div>';}
+}
+window.closeHotDetail=()=>{ hotLoaded=false; subShow('u-hot'); curHotBiz=null; loadHotplaces(true); };
+
+/* 리뷰 시스템 — 도착완료한 매장에만 작성 가능, 1매장 1리뷰 */
+async function loadHotReviews(bizId){
+  if(!NW.fbLoaded) await NW.fbReady;
+  const {collection,query,where,getDocs,orderBy}=NW.fb;
+  // 1) 이 매장 리뷰 목록
+  let snap;
+  try{ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId),orderBy('at','desc'))); }
+  catch(e){ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId))); }
+  const list=snap.docs.map(d=>({id:d.id,...d.data()}));
+  // 2) 내 리뷰 자격: 이 매장에 도착완료(done) 기록이 있는지
+  let canReview=false; let myReview=null;
+  if(NW.uid){
+    canReview = await checkArrivedAt(bizId);
+    myReview = list.find(r=>r.uid===NW.uid);
+  }
+  renderReviewSection(bizId, list, canReview, myReview);
+}
+async function checkArrivedAt(bizId){
+  try{
+    const {collection,query,where,getDocs}=NW.fb;
+    const snap=await getDocs(query(collection(NW.db,'nw_calls'),
+      where('callerId','==',NW.uid),where('matchedBizId','==',bizId),where('status','==','done')));
+    return !snap.empty;
+  }catch(e){return false;}
+}
+function renderReviewSection(bizId,list,canReview,myReview){
+  // 내 리뷰 작성/표시
+  if(myReview){
+    $('hd-myreview').innerHTML=`<div class="statbox" style="margin-top:0">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div><b style="color:var(--y)">내 리뷰 ${'⭐'.repeat(myReview.rating)}</b>
+          <div class="muted" style="margin-top:4px;font-size:13px">${myReview.text||''}</div></div>
+        <button class="adm-btn danger" style="padding:5px 9px;font-size:11px" onclick="deleteMyReview('${myReview.id}','${bizId}')">삭제</button>
+      </div></div>`;
+  }else if(canReview){
+    $('hd-myreview').innerHTML=`<div class="statbox" style="margin-top:0">
+      <div class="field-lb" style="margin-bottom:8px">방문 후기를 남겨주세요</div>
+      <div id="rvStars" style="display:flex;gap:6px;font-size:30px;margin-bottom:10px;user-select:none">
+        ${[1,2,3,4,5].map(n=>`<span data-n="${n}" onclick="pickStar(${n})" style="cursor:pointer;color:var(--tx3)">★</span>`).join('')}
+      </div>
+      <textarea class="inp" id="rvText" rows="2" placeholder="음식·분위기·서비스 등 자유롭게"></textarea>
+      <button class="cta" style="margin-top:10px" onclick="submitReview('${bizId}')">리뷰 등록</button>
+    </div>`;
+  }else{
+    $('hd-myreview').innerHTML=`<div class="muted" style="font-size:12px;margin-bottom:14px">방문 후 도착완료한 매장만 리뷰를 작성할 수 있어요.</div>`;
+  }
+  // 리뷰 목록 (내 리뷰 제외하고 표시)
+  const others=list.filter(r=>r.uid!==NW.uid);
+  if(!others.length && !myReview){
+    $('hd-reviews').innerHTML=`<div class="muted" style="font-size:13px">아직 다른 리뷰가 없어요.</div>`;
+  }else if(!others.length){
+    $('hd-reviews').innerHTML=`<div class="muted" style="font-size:13px">다른 리뷰는 아직 없어요.</div>`;
+  }else{
+    $('hd-reviews').innerHTML=others.map(r=>{
+      const t=r.at?.toDate?r.at.toDate():null;
+      const ts=t?`${t.getMonth()+1}/${t.getDate()}`:'';
+      return `<div class="bizdetail" style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+          <b style="color:var(--y)">${'⭐'.repeat(r.rating||0)}</b>
+          <span style="color:var(--tx3);font-size:11px">${r.userName||r.uid?.slice(0,6)||''} · ${ts}</span>
+        </div>
+        <div style="color:var(--tx2);font-size:13px">${(r.text||'').replace(/</g,'&lt;')}</div></div>`;
+    }).join('');
+  }
+}
+let rvRating=0;
+window.pickStar=n=>{
+  rvRating=n;
+  document.querySelectorAll('#rvStars span').forEach(s=>{s.style.color=(+s.dataset.n<=n)?'var(--y)':'var(--tx3)';});
+};
+window.submitReview=async(bizId)=>{
+  if(!rvRating){toast('별점을 선택해 주세요');return;}
+  const text=$('rvText').value.trim();
+  const {doc,setDoc,serverTimestamp,getDocs,collection,query,where,updateDoc}=NW.fb;
+  const reviewId=`${bizId}_${NW.uid}`;
+  try{
+    await setDoc(doc(NW.db,'nw_reviews',reviewId),{
+      bizId, bizName:curHotBiz?.name||'', uid:NW.uid,
+      userName:NW.user?.displayName||'', rating:rvRating, text, at:serverTimestamp()
+    });
+    // 매장 평균 갱신
+    await updateBizRating(bizId);
+    toast('리뷰가 등록됐어요. 감사합니다!');
+    rvRating=0; loadHotReviews(bizId);
+  }catch(e){toast('실패: '+e.message);}
+};
+window.deleteMyReview=async(reviewId,bizId)=>{
+  if(!confirm('내 리뷰를 삭제할까요?'))return;
+  const {doc,deleteDoc}=NW.fb;
+  try{
+    await deleteDoc(doc(NW.db,'nw_reviews',reviewId));
+    await updateBizRating(bizId);
+    toast('삭제 완료'); loadHotReviews(bizId);
+  }catch(e){toast('실패: '+e.message);}
+};
+async function updateBizRating(bizId){
+  const {collection,query,where,getDocs,doc,updateDoc}=NW.fb;
+  const snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId)));
+  if(snap.empty){
+    await updateDoc(doc(NW.db,'nw_biz',bizId),{ratingAvg:0,ratingCount:0}).catch(()=>{});
+    return;
+  }
+  let sum=0,n=0;
+  snap.forEach(d=>{const r=d.data();if(r.rating){sum+=r.rating;n++;}});
+  const avg=n?+(sum/n).toFixed(2):0;
+  await updateDoc(doc(NW.db,'nw_biz',bizId),{ratingAvg:avg,ratingCount:n}).catch(()=>{});
 }
 
 function buildChips(){
