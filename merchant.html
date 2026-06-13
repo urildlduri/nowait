@@ -276,7 +276,7 @@ function listenArrivals(){
   const {collection,query,where,onSnapshot}=NW.fb;
   const q=query(collection(NW.db,'nw_calls'),where('matchedBizId','==',myBizId));
   arrUnsub=onSnapshot(q,snap=>{
-    arrivals=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>c.status==='matched');
+    arrivals=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>['accepted','going','matched'].includes(c.status));
     renderArrivals();
   });
   clearInterval(arrTimer);arrTimer=setInterval(renderArrivals,1000);
@@ -287,16 +287,49 @@ function renderArrivals(){
   if(!arrivals.length){area.innerHTML='<div class="standby" style="padding:24px"><p>아직 확정된 손님이 없습니다.</p></div>';return;}
   area.innerHTML='<div class="calls-grid">'+arrivals.map(c=>{
     const cat=catOf(c.cat);
-    const left=c.matchExpiresAt?(tsMs(c.matchExpiresAt)-nowMs())/1000:0;
     const uid=(c.callerId||'').slice(0,6)||'guest';
+    const guest = c.callerName ? `<b>${c.callerName}</b>님` : `손님 <span class="mono">#${uid}</span>`;
+    if(c.status==='accepted'){
+      const left=c.goingDeadline?(tsMs(c.goingDeadline)-nowMs())/1000:0;
+      return `<div class="callcard" style="border-color:var(--soon)">
+        <div class="ch"><div class="party">${c.party}<span>명</span></div>
+          <div class="dist mono" style="background:var(--soonbg);color:var(--soon)">응답 대기</div></div>
+        <div class="cmeta">${cat.e} ${cat.n} · ${guest}</div>
+        <div class="ctimer mono" style="color:var(--soon)">⏳ 손님이 「갈게요」를 누르길 대기 (${left>0?Math.ceil(left)+'초':'마감'})</div>
+        </div>`;
+    }
+    const left=c.matchExpiresAt?(tsMs(c.matchExpiresAt)-nowMs())/1000:0;
     const over=left<=0;
     return `<div class="callcard" style="border-color:${over?'var(--no)':'var(--ok)'}">
       <div class="ch"><div class="party">${c.party}<span>명</span></div>
         <div class="dist mono" style="background:${over?'var(--nobg)':'var(--okbg)'};color:${over?'var(--no)':'var(--ok)'}">${over?'시간초과':'도착중'}</div></div>
-      <div class="cmeta">${cat.e} ${cat.n} · 손님 <span class="mono">#${uid}</span></div>
-      <div class="ctimer mono" style="color:${over?'var(--no)':'var(--soon)'}">⏱ ${over?'마감 — 노쇼 처리됨':fmtT(left)+' 내 도착 예정'}</div>
+      <div class="cmeta">${cat.e} ${cat.n} · ${guest}</div>
+      <div class="ctimer mono" style="color:${over?'var(--no)':'var(--soon)'}">⏱ ${over?'노쇼 가능 — 자동 처리됨':fmtT(left)+' 내 도착 예정'}</div>
+      <div class="resp-row" style="margin-top:8px">
+        <button class="resp-btn rb-ok" onclick="confirmArrival('${c.id}')">✓ 도착 확인</button>
+        <button class="resp-btn rb-no" onclick="markNoShow('${c.id}')">노쇼</button>
+      </div>
       </div>`;}).join('')+'</div>';
 }
+
+window.confirmArrival=async(callId)=>{
+  const c=arrivals.find(x=>x.id===callId);
+  const name=c?.callerName||'손님';
+  if(!confirm(`${name}님이 도착했나요?`))return;
+  const {doc,updateDoc,serverTimestamp}=NW.fb;
+  try{
+    await updateDoc(doc(NW.db,'nw_calls',callId),{status:'done',arrivedAt:serverTimestamp()});
+    toast('🎉 도착 확인 완료');
+  }catch(e){toast('실패: '+e.message);}
+};
+window.markNoShow=async(callId)=>{
+  const c=arrivals.find(x=>x.id===callId);
+  const name=c?.callerName||'이 손님';
+  if(!confirm(`${name}을(를) 노쇼 처리할까요? (손님에게 패널티 적용)`))return;
+  const {doc,updateDoc}=NW.fb;
+  try{ await updateDoc(doc(NW.db,'nw_calls',callId),{status:'noshow'}); toast('노쇼 처리됨'); }
+  catch(e){toast('실패: '+e.message);}
+};
 window.setBizStatus=async(s,silent)=>{
   myBiz.status=s;
   $('st-open').classList.toggle('on',s==='open');
@@ -447,15 +480,14 @@ window.respond=async(callId,type)=>{
     at:serverTimestamp()});
   respondedCalls.add(callId);
   if(type!=='no'){stats.resp++;$('tsResp').textContent=stats.resp;}
-  // 핫플 직접호출(directBizId 있음) + '가능' 응답이면 즉시 매칭 확정
+  // 핫플 직접호출(directBizId 있음) + '가능' 응답이면 'accepted' 상태로 (사용자 '갈게요' 대기)
   if(type==='ok' && cd.directBizId===myBizId){
-    const matchExp=Timestamp.fromMillis(nowMs()+15*60*1000);
+    const goingDeadline=Timestamp.fromMillis(nowMs()+30*1000);
     await updateDoc(doc(NW.db,'nw_calls',callId),{
-      status:'matched', matchedBizId:myBizId, matchedBizName:myBiz.name,
-      matchedAt:serverTimestamp(), matchExpiresAt:matchExp
+      status:'accepted', matchedBizId:myBizId, matchedBizName:myBiz.name,
+      acceptedAt:serverTimestamp(), goingDeadline
     }).catch(()=>{});
-    stats.match++;$('tsMatch').textContent=stats.match;
-    toast('🎉 직접호출 수락 — 손님이 15분 안에 도착할 예정이에요');
+    toast('🎉 직접호출 수락 — 손님이 30초 안에 「갈게요」를 누르면 예약 확정');
   }else{
     toast(type==='ok'?'「가능」 응답 전송':type==='soon'?'「10분 후」 응답 전송':'「불가」 응답');
   }

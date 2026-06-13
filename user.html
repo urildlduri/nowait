@@ -83,9 +83,10 @@
         <div class="countdown"><div class="lb">입장 마감까지</div><div class="t mono" id="mTimer">15:00</div></div>
       </div>
       <div class="bizdetail" id="mDetail"></div>
-      <button class="cta" onclick="arrive()">✓ 도착 완료</button>
-      <button class="cta danger" style="margin-top:10px" onclick="cancelMatch()">매칭 취소</button>
-      <div class="demo-hint" style="margin-top:16px">제한 시간 안에 <b>도착 완료</b>를 누르지 않으면 노쇼 처리되어 30분간 호출이 제한됩니다.</div>
+      <div class="statbox" style="margin-top:14px;text-align:center">
+        <div style="font-size:13px;color:var(--tx2);line-height:1.6">매장에 도착하면 사장님이 <b style="color:var(--y)">도착 확인</b>을 눌러줘요.<br>15분 안에 안 가면 자동 노쇼 처리돼요.</div>
+      </div>
+      <button class="cta danger" style="margin-top:14px" onclick="cancelMatch()">못 가요 (취소)</button>
     </div>
   </div>
 
@@ -179,6 +180,26 @@
       <button class="cta ghost" style="margin-top:24px" onclick="cancelDirect()">취소하기</button>
     </div>
   </div>
+
+  <!-- 매장이 수락 — 사용자 '갈게요/못가요' 확정 화면 -->
+  <div id="u-accepted" class="scr">
+    <div class="page">
+      <div style="text-align:center;padding:30px 0 20px">
+        <div class="big" style="font-size:64px">🎉</div>
+        <h2 style="margin-top:16px">받아줬어요!</h2>
+        <p class="muted" id="acBizName" style="margin-top:6px">--</p>
+      </div>
+      <div class="statbox" style="margin-top:0;border-color:var(--y)">
+        <div style="font-size:13px;color:var(--tx2);line-height:1.6">매장이 자리를 잡아두고 기다리고 있어요. <b style="color:var(--y)">30초 안에</b> 「갈게요」를 눌러주세요. 안 누르면 자동 취소돼요.</div>
+        <div style="text-align:center;margin-top:14px;font-size:32px;font-weight:800;color:var(--y)" id="acSec">30</div>
+      </div>
+      <button class="cta" style="margin-top:20px" onclick="confirmGoing()">🚶 갈게요</button>
+      <button class="cta ghost" style="margin-top:10px" onclick="declineGoing()">못 가요</button>
+    </div>
+  </div>
+
+  <!-- 매칭 진행 표시 바 (위치: bnav 위) -->
+  <div id="matchBar" class="match-bar hide" onclick="reopenMatch()"></div>
 
   <div class="bnav">
     <button id="n-home" class="on" onclick="uGo('u-home','n-home')"><span class="bi">🔍</span>호출</button>
@@ -361,7 +382,7 @@ window.directCall=async()=>{
   const expires=Timestamp.fromMillis(nowMs()+DIRECT_TTL*1000);
   try{
     const ref=await addDoc(collection(NW.db,'nw_calls'),{
-      callerId:NW.uid, party:dcParty,
+      callerId:NW.uid, callerName:NW.user?.displayName||'', party:dcParty,
       cats:[b.cat], cat:b.cat,
       lat:myLoc.lat, lng:myLoc.lng,
       directBizId:b.id, directBizName:b.name,   // 1:1 호출 표시
@@ -392,40 +413,80 @@ function startDirectTimer(){
 function listenDirectResponse(bizId){
   if(dcUnsub) dcUnsub();
   const {doc,onSnapshot,collection}=NW.fb;
-  // 호출 문서 감시(매장이 응답하면 status 변경) + responses 서브컬렉션 감시
   const callRef=doc(NW.db,'nw_calls',dcCallId);
   const u1=onSnapshot(callRef,s=>{
     if(!s.exists())return;
     const d=s.data();
-    if(d.status==='matched' && d.matchedBizId===bizId){
-      // 가능 응답 → 자동 매칭 확정 (사용자에게 매칭 화면)
-      onDirectAccepted(d);
+    if(d.status==='accepted' && d.matchedBizId===bizId){
+      onDirectAccepted(d);   // 매장 OK → 사용자 '갈게요' 확정 화면
     }else if(d.status==='cancelled'||d.status==='expired'){
       onDirectTimeout();
     }
   });
-  // 응답 서브컬렉션 감시 (불가/10분후/가능 모두)
   const u2=onSnapshot(collection(NW.db,'nw_calls',dcCallId,'responses'),snap=>{
     snap.forEach(d=>{
       const r=d.data();
       if(r.bizId!==bizId) return;
       if(r.type==='no'){ onDirectRejected(); }
       else if(r.type==='soon'){ onDirectSoon(r); }
-      // 'ok'는 매장이 별도로 matchedBizId 설정해야 매칭 확정. 매장 콘솔이 ok 응답 후 직접호출 자동 매칭 처리.
     });
   });
   dcUnsub=()=>{u1();u2();};
 }
 
+let acTimer=null;
 async function onDirectAccepted(d){
   cleanupDirect();
   toast('🎉 매장이 받아줬어요!');
-  // 매칭 데이터 구성해서 기존 매칭 화면으로
   matchData={callId:dcCallId, id:curHotBiz?.id, bizName:d.matchedBizName||curHotBiz?.name,
     cat:curHotBiz?.cat, type:'ok', biz:curHotBiz};
-  curCallId=null;
-  openMatched(nowMs()+MATCH_TTL*1000);
+  curCallId=dcCallId;
+  $('acBizName').textContent=d.matchedBizName||curHotBiz?.name||'매장';
+  subShow('u-accepted');
+  // 30초 카운트다운 — 안 누르면 자동 취소
+  const goingDeadline = d.goingDeadline ? tsMs(d.goingDeadline) : nowMs()+30000;
+  if(acTimer) clearInterval(acTimer);
+  const tick=()=>{
+    const left=Math.max(0,Math.ceil((goingDeadline-nowMs())/1000));
+    $('acSec').textContent=left;
+    if(left<=0){ clearInterval(acTimer); onAcceptedTimeout(); }
+  };
+  tick(); acTimer=setInterval(tick,500);
+  updateMatchBar();
 }
+function onAcceptedTimeout(){
+  if(curCallId){
+    const {doc,updateDoc}=NW.fb;
+    updateDoc(doc(NW.db,'nw_calls',curCallId),{status:'cancelled'}).catch(()=>{});
+  }
+  curCallId=null; matchData=null;
+  hideMatchBar();
+  toast('30초가 지나 자동 취소됐어요');
+  subShow('u-hotdetail');
+}
+window.confirmGoing=async()=>{
+  if(!curCallId) return;
+  if(acTimer){clearInterval(acTimer); acTimer=null;}
+  const {doc,updateDoc,serverTimestamp,Timestamp}=NW.fb;
+  try{
+    const matchExp=Timestamp.fromMillis(nowMs()+MATCH_TTL*1000);
+    await updateDoc(doc(NW.db,'nw_calls',curCallId),{
+      status:'going', goingAt:serverTimestamp(), matchExpiresAt:matchExp
+    });
+    toast('🚶 갈게요! 15분 안에 도착하세요.');
+    openMatched(nowMs()+MATCH_TTL*1000);
+  }catch(e){toast('실패: '+e.message);}
+};
+window.declineGoing=async()=>{
+  if(!confirm('정말 가지 않으시겠어요?'))return;
+  if(acTimer){clearInterval(acTimer); acTimer=null;}
+  const {doc,updateDoc}=NW.fb;
+  try{ if(curCallId) await updateDoc(doc(NW.db,'nw_calls',curCallId),{status:'cancelled'}); }catch(e){}
+  curCallId=null; matchData=null;
+  hideMatchBar();
+  toast('취소했어요');
+  subShow('u-hotdetail');
+};
 function onDirectRejected(){
   cleanupDirect();
   cancelDirectDoc('cancelled');
@@ -634,7 +695,7 @@ window.startCall=async()=>{
   const {collection,addDoc,serverTimestamp,Timestamp}=NW.fb;
   const expires=Timestamp.fromMillis(nowMs()+CALL_TTL*1000);
   const ref=await addDoc(collection(NW.db,'nw_calls'),{
-    callerId:NW.uid, party:sel.party,
+    callerId:NW.uid, callerName:NW.user?.displayName||'', party:sel.party,
     cats:sel.cats, cat:sel.cats[0],   // 다중 + 구버전 호환
     lat:myLoc.lat, lng:myLoc.lng,
     status:'searching', createdAt:serverTimestamp(), expiresAt:expires});
@@ -805,28 +866,113 @@ window.confirmMatch=async()=>{
     }
     const matchExp=Timestamp.fromMillis(nowMs()+MATCH_TTL*1000);
     await updateDoc(doc(NW.db,'nw_calls',curCallId),{
-      status:'matched',matchedBizId:r.id,matchedBizName:r.bizName,matchedAt:serverTimestamp(),matchExpiresAt:matchExp});
-    matchData={callId:curCallId,...r,biz:detailBiz};cleanupCall();openMatched(nowMs()+MATCH_TTL*1000);
+      status:'going', matchedBizId:r.id, matchedBizName:r.bizName,
+      matchedAt:serverTimestamp(), goingAt:serverTimestamp(), matchExpiresAt:matchExp});
+    matchData={callId:curCallId,...r,biz:detailBiz, party:sel.party};
+    cleanupCall();
+    openMatched(nowMs()+MATCH_TTL*1000);
   }catch(e){
     toast('매칭 실패: '+(e.code||e.message));
     if(btn){btn.disabled=false;btn.textContent='여기로 갈게요';}
   }finally{ matching=false; }
 };
 function openMatched(end){const r=matchData,c=catOf(r.cat||sel.cats[0]);
+  matchData._matchEnd=end;
+  matchBarState='going';
   $('mName').textContent=r.bizName||'매장';
   $('mSub').textContent=r.type==='ok'?'지금 바로 입장 가능합니다':'약 10분 후 입장 가능합니다';
   const b=r.biz||{};
   let routeRow='';
   if(b.lat&&b.lng)routeRow=`<div class="row"><span>길찾기</span><b><a href="${NW.kakaoRoute(r.bizName,b.lat,b.lng)}" target="_blank" rel="noopener" style="color:var(--y)">카카오맵 열기 →</a></b></div>`;
   $('mDetail').innerHTML=`<div class="row"><span>업종</span><b>${c.e} ${c.n}</b></div>
-    <div class="row"><span>인원</span><b>${sel.party}명</b></div>
-    <div class="row"><span>거리</span><b>${distLabel(r.dist)}</b></div>
+    <div class="row"><span>인원</span><b>${r.party||sel.party}명</b></div>
+    <div class="row"><span>거리</span><b>${distLabel(r.dist||0)}</b></div>
     ${b.phone?`<div class="row"><span>전화</span><b>${b.phone}</b></div>`:''}
-    <div class="row"><span>상태</span><b style="color:${r.type==='ok'?'var(--ok)':'var(--soon)'}">${r.type==='ok'?'입장 가능':'10분 후'}</b></div>
+    <div class="row"><span>상태</span><b style="color:var(--ok)">입장 가능</b></div>
     ${routeRow}`;
   subShow('u-matched');clearInterval(matchTimer);
-  const tick=()=>{const left=(end-nowMs())/1000;$('mTimer').textContent=fmtT(left);if(left<=0){clearInterval(matchTimer);noShow();}};
-  tick();matchTimer=setInterval(tick,500);}
+  updateMatchBar();
+  const tick=()=>{
+    const left=(end-nowMs())/1000;
+    $('mTimer').textContent=fmtT(left);
+    // 매장이 도착 확인하면 done 상태로 → 자동 종료
+    if(left<=0){clearInterval(matchTimer);}
+  };
+  tick();matchTimer=setInterval(tick,500);
+  // 매장이 도착확인/노쇼 처리 감지
+  watchMatchStatus();
+}
+
+let matchStatusUnsub=null;
+function watchMatchStatus(){
+  if(!matchData?.callId) return;
+  if(matchStatusUnsub) matchStatusUnsub();
+  const {doc,onSnapshot}=NW.fb;
+  matchStatusUnsub=onSnapshot(doc(NW.db,'nw_calls',matchData.callId),s=>{
+    if(!s.exists())return;
+    const d=s.data();
+    if(d.status==='done'){
+      clearInterval(matchTimer);
+      hideMatchBar();
+      matchStatusUnsub();matchStatusUnsub=null;
+      saveHist('done');
+      toast('🎉 도착 완료! 즐거운 시간 되세요');
+      matchData=null;curCallId=null;
+      subShow('u-home');
+    }else if(d.status==='noshow'){
+      clearInterval(matchTimer);
+      hideMatchBar();
+      matchStatusUnsub();matchStatusUnsub=null;
+      onNoShowReceived();
+    }else if(d.status==='cancelled'){
+      clearInterval(matchTimer);
+      hideMatchBar();
+      matchStatusUnsub();matchStatusUnsub=null;
+      matchData=null;curCallId=null;
+      subShow('u-home');
+    }
+  });
+}
+async function onNoShowReceived(){
+  penaltyUntil=nowMs()+PENALTY*1000;
+  const {doc,setDoc,Timestamp}=NW.fb;
+  await setDoc(doc(NW.db,'nw_users',NW.uid),{penaltyUntil:Timestamp.fromMillis(penaltyUntil)},{merge:true}).catch(()=>{});
+  await saveHist('noshow');
+  matchData=null;curCallId=null;
+  toast('노쇼 처리됐어요. 30분 패널티가 적용됩니다.');
+  renderPenaltyBanner();subShow('u-home');
+}
+
+/* 매칭 진행 인디케이터 바 */
+let matchBarTimer=null, matchBarState=null;
+function updateMatchBar(){
+  const bar=$('matchBar'); if(!bar) return;
+  if(matchBarTimer){clearInterval(matchBarTimer);matchBarTimer=null;}
+  if(!curCallId || !matchData){bar.classList.add('hide'); return;}
+  const render=()=>{
+    let icon='🎯', label=matchData.bizName||'매칭 진행중', timeText='';
+    if(matchBarState==='accepted'){
+      const sec=parseInt($('acSec')?.textContent||0);
+      icon='🎉'; timeText=`갈게요? ${sec}초 남음`;
+    }else if(matchBarState==='going'){
+      const end=matchData._matchEnd||nowMs()+MATCH_TTL*1000;
+      const left=Math.max(0,Math.ceil((end-nowMs())/1000));
+      icon='🚶'; timeText=`${fmtT(left)} 내 도착`;
+    }
+    bar.innerHTML=`<span class="mb-i">${icon}</span><span class="mb-txt">${label} · ${timeText}</span><span class="mb-arrow">›</span>`;
+  };
+  bar.classList.remove('hide');
+  render(); matchBarTimer=setInterval(render,500);
+}
+function hideMatchBar(){
+  if(matchBarTimer){clearInterval(matchBarTimer);matchBarTimer=null;}
+  $('matchBar')?.classList.add('hide');
+  matchBarState=null;
+}
+window.reopenMatch=()=>{
+  if(matchBarState==='accepted') subShow('u-accepted');
+  else if(matchBarState==='going') subShow('u-matched');
+};
 /* 호출 종료 시 위치 정밀도 낮추기 (소수점 3자리 ≈ 100m) — 데이터 최소화 */
 async function coarsenCallLocation(callId){
   if(!callId) return;
@@ -846,9 +992,15 @@ async function coarsenCallLocation(callId){
 window.arrive=async()=>{clearInterval(matchTimer);
   if(matchData){const {doc,updateDoc,serverTimestamp}=NW.fb;await updateDoc(doc(NW.db,'nw_calls',matchData.callId),{status:'done',arrivedAt:serverTimestamp()}).catch(()=>{});await coarsenCallLocation(matchData.callId);}
   await saveHist('done');toast('도착 완료! 즐거운 시간 되세요 🎉');matchData=null;curCallId=null;subShow('u-home');};
-window.cancelMatch=async()=>{clearInterval(matchTimer);
+window.cancelMatch=async()=>{
+  if(!confirm('정말 매칭을 취소할까요? 매장에 자리를 비워주세요.'))return;
+  clearInterval(matchTimer);
+  if(matchStatusUnsub){matchStatusUnsub();matchStatusUnsub=null;}
   if(matchData){const {doc,updateDoc}=NW.fb;await updateDoc(doc(NW.db,'nw_calls',matchData.callId),{status:'cancelled'}).catch(()=>{});await coarsenCallLocation(matchData.callId);}
-  await saveHist('cancelled');matchData=null;curCallId=null;subShow('u-home');};
+  await saveHist('cancelled');
+  hideMatchBar();
+  matchData=null;curCallId=null;subShow('u-home');
+};
 async function noShow(){
   const {doc,updateDoc,setDoc,Timestamp}=NW.fb;
   if(matchData){await updateDoc(doc(NW.db,'nw_calls',matchData.callId),{status:'noshow'}).catch(()=>{});await coarsenCallLocation(matchData.callId);}
