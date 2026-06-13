@@ -311,12 +311,21 @@ function listenCalls(){
   callsUnsub=onSnapshot(q,snap=>{
     const list=[];
     snap.forEach(d=>{const c={id:d.id,...d.data()};
-      if(c.status!=='searching')return;                     // 탐색중만
-      const exp=tsMs(c.expiresAt);if(exp&&exp<nowMs())return; // 만료 제외
-      if(c.party < (myBiz.minParty||1))return;               // 최소 인원 미달 제외
-      const dist=haversine(myBiz,{lat:c.lat,lng:c.lng});
-      if(dist>(myBiz.radius||2000))return;                   // 반경 밖 제외
-      c._dist=dist;list.push(c);});
+      if(c.status!=='searching')return;
+      const exp=tsMs(c.expiresAt);if(exp&&exp<nowMs())return;
+      // 직접호출(이 매장 지목)은 거리·최소인원 필터 우회
+      const isDirectToMe = c.directBizId === myBizId;
+      // 다른 매장 지목 직접호출은 제외
+      if(c.directBizId && !isDirectToMe) return;
+      if(!isDirectToMe){
+        if(c.party < (myBiz.minParty||1))return;
+        const dist=haversine(myBiz,{lat:c.lat,lng:c.lng});
+        if(dist>(myBiz.radius||2000))return;
+        c._dist=dist;
+      }else{
+        c._dist=haversine(myBiz,{lat:c.lat,lng:c.lng});
+      }
+      list.push(c);});
     renderCalls(list);
   },err=>{ console.error('[listenCalls] 쿼리 오류:',err); toast('호출 수신 오류: '+(err.code||err.message)); });
 }
@@ -416,16 +425,18 @@ function vibrate(){
   if(navigator.vibrate) try{ navigator.vibrate([220,120,220]); }catch(e){}
 }
 function callCard(c){const cat=catOf(c.cat);const done=respondedCalls.has(c.id);let action;
+  const isDirect = c.directBizId === myBizId;
   if(done)action=`<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>`;
   else if(myBiz.status==='busy')action=`<div class="resp-row"><button class="resp-btn rb-soon" onclick="respond('${c.id}','soon')">10분 후</button><button class="resp-btn rb-no" onclick="respond('${c.id}','no')">불가</button></div>`;
   else action=`<div class="resp-row"><button class="resp-btn rb-ok" onclick="respond('${c.id}','ok')">가능</button><button class="resp-btn rb-soon" onclick="respond('${c.id}','soon')">10분 후</button><button class="resp-btn rb-no" onclick="respond('${c.id}','no')">불가</button></div>`;
-  return `<div class="callcard fresh" id="call-${c.id}"><div class="ch"><div class="party">${c.party}<span>명</span></div><div class="dist mono">${distLabel(c._dist)}</div></div>
-    <div class="cmeta">${cat.e} ${cat.n} 요청</div><div class="ctimer mono" id="ct-${c.id}">⏱ 대기중</div>${action}</div>`;}
+  const directBadge = isDirect ? `<div style="position:absolute;top:8px;right:8px;background:var(--y);color:#000;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px">📞 직접호출</div>` : '';
+  return `<div class="callcard fresh" id="call-${c.id}" style="position:relative">${directBadge}<div class="ch"><div class="party">${c.party}<span>명</span></div><div class="dist mono">${distLabel(c._dist)}</div></div>
+    <div class="cmeta">${cat.e} ${cat.n} 요청${isDirect?' · 본 매장 지목':''}</div><div class="ctimer mono" id="ct-${c.id}">⏱ 대기중</div>${action}</div>`;}
 function startCallTimer(id,exp){if(callTimers[id])return;
   callTimers[id]=setInterval(()=>{const el=$('ct-'+id);if(!el){clearInterval(callTimers[id]);delete callTimers[id];return;}
     const left=(exp-nowMs())/1000;el.textContent='⏱ '+fmtT(left)+' 남음';if(left<=0){clearInterval(callTimers[id]);delete callTimers[id];}},500);}
 window.respond=async(callId,type)=>{
-  const {doc,getDoc,setDoc,onSnapshot,serverTimestamp}=NW.fb;
+  const {doc,getDoc,setDoc,updateDoc,onSnapshot,serverTimestamp,Timestamp}=NW.fb;
   const cs=await getDoc(doc(NW.db,'nw_calls',callId));
   if(!cs.exists()||cs.data().status!=='searching'){toast('이미 마감된 호출이에요.');return;}
   const cd=cs.data();const realDist=haversine(myBiz,{lat:cd.lat,lng:cd.lng});
@@ -434,9 +445,20 @@ window.respond=async(callId,type)=>{
     at:serverTimestamp()});
   respondedCalls.add(callId);
   if(type!=='no'){stats.resp++;$('tsResp').textContent=stats.resp;}
-  toast(type==='ok'?'「가능」 응답 전송':type==='soon'?'「10분 후」 응답 전송':'「불가」 응답');
+  // 핫플 직접호출(directBizId 있음) + '가능' 응답이면 즉시 매칭 확정
+  if(type==='ok' && cd.directBizId===myBizId){
+    const matchExp=Timestamp.fromMillis(nowMs()+15*60*1000);
+    await updateDoc(doc(NW.db,'nw_calls',callId),{
+      status:'matched', matchedBizId:myBizId, matchedBizName:myBiz.name,
+      matchedAt:serverTimestamp(), matchExpiresAt:matchExp
+    }).catch(()=>{});
+    stats.match++;$('tsMatch').textContent=stats.match;
+    toast('🎉 직접호출 수락 — 손님이 15분 안에 도착할 예정이에요');
+  }else{
+    toast(type==='ok'?'「가능」 응답 전송':type==='soon'?'「10분 후」 응답 전송':'「불가」 응답');
+  }
   const un=onSnapshot(doc(NW.db,'nw_calls',callId),s=>{if(!s.exists())return;const d=s.data();
-    if(d.status==='matched'&&d.matchedBizId===myBizId){stats.match++;$('tsMatch').textContent=stats.match;toast('🎉 우리 매장이 선택됐어요!');un();}
+    if(d.status==='matched'&&d.matchedBizId===myBizId){un();}
     else if(d.status==='matched'&&d.matchedBizId!==myBizId){toast('아쉽게도 다른 매장으로 매칭됐어요.');un();}
     else if(['expired','cancelled','done','noshow'].includes(d.status))un();});
   const el=$('call-'+callId);if(el){const btn=el.querySelector('.resp-row');if(btn)btn.outerHTML='<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>';}

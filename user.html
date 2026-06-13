@@ -144,6 +144,18 @@
       </div>
       <div id="hd-map" style="width:100%;height:200px;border-radius:var(--rad);margin-top:18px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
       <a id="hd-route" class="cta ghost" style="margin-top:10px;display:block;text-align:center" target="_blank" rel="noopener">🧭 카카오맵 길찾기</a>
+
+      <!-- 핫플 1:1 호출 -->
+      <div class="statbox" style="margin-top:16px;border:2px solid var(--y)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <b style="color:var(--y);font-size:15px">📞 이 매장에 직접 호출하기</b>
+        </div>
+        <div class="muted" style="font-size:12px;margin-bottom:10px">지금 자리가 있는지 1:1로 물어봐요. 3분 안에 응답이 없으면 자동 취소.</div>
+        <div class="field-lb" style="margin-bottom:6px">인원</div>
+        <div class="chips" id="hdPartyChips"></div>
+        <button class="cta" id="hdCallBtn" style="margin-top:10px" onclick="directCall()" disabled>지금 가능 한가요?</button>
+      </div>
+
       <div id="hd-contact"></div>
       <div id="hd-menu"></div>
       <div id="hd-info"></div>
@@ -151,6 +163,20 @@
       <div class="h2">리뷰</div>
       <div id="hd-myreview"></div>
       <div id="hd-reviews"><div class="muted" style="font-size:13px">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요.</div></div>
+    </div>
+  </div>
+
+  <!-- 핫플 직접호출 응답 대기 -->
+  <div id="u-direct" class="scr">
+    <div class="page">
+      <div style="text-align:center;padding:40px 0 30px">
+        <div class="big" style="font-size:64px">📞</div>
+        <h2 style="margin-top:16px">매장에 호출 중…</h2>
+        <p class="muted" id="dcTarget" style="margin-top:6px">--</p>
+      </div>
+      <div class="ring-wrap"><div class="ring"><svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="54"/><circle id="dcRing" class="ring-fg" cx="60" cy="60" r="54"/></svg><div class="ring-num"><span id="dcSec">180</span><small>초</small></div></div>
+        <div class="ring-info"><b>응답 대기 중</b><small>3분 안에 응답이 없으면 자동 취소</small></div></div>
+      <button class="cta ghost" style="margin-top:24px" onclick="cancelDirect()">취소하기</button>
     </div>
   </div>
 
@@ -253,8 +279,10 @@ window.openHotDetail=async(bizId)=>{
 };
 
 let curHotBiz=null;
+let dcParty=null, dcCallId=null, dcTimer=null, dcUnsub=null;
 function showHotDetail(b){
   curHotBiz=b;
+  dcParty=null;
   subShow('u-hotdetail');
   const cat=catOf(b.cat);
   // 사진
@@ -292,9 +320,17 @@ function showHotDetail(b){
     info.map(r=>`<div class="row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')+`</div>`;
   // 지도
   drawHotMap(b);
+  // 핫플 직접호출 인원 칩
+  $('hdPartyChips').innerHTML=NW.PARTY.map(n=>`<button class="chip" data-n="${n}" onclick="pickDcParty(${n})">${n}${n===6?'+':''}명</button>`).join('');
+  $('hdCallBtn').disabled=true;
   // 리뷰
   loadHotReviews(b.id);
 }
+window.pickDcParty=n=>{
+  dcParty=n;
+  document.querySelectorAll('#hdPartyChips .chip').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
+  $('hdCallBtn').disabled = !(dcParty && curHotBiz && myLoc && !penalActive());
+};
 function hotPhotoFallback(c){return `<div style="width:100%;height:200px;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:72px">${c.e}</div>`;}
 async function drawHotMap(b){
   const box=$('hd-map');
@@ -314,6 +350,116 @@ async function drawHotMap(b){
   }catch(e){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:12px;text-align:center;padding:10px">지도를 불러올 수 없어요</div>';}
 }
 window.closeHotDetail=()=>{ hotLoaded=false; subShow('u-hot'); curHotBiz=null; loadHotplaces(true); };
+
+/* 핫플 1:1 직접 호출 — 특정 매장 지목 호출. 3분 응답 대기. */
+const DIRECT_TTL = 180; // 3분
+window.directCall=async()=>{
+  if(!curHotBiz || !dcParty || !myLoc){toast('인원·위치를 확인하세요');return;}
+  if(penalActive()){toast('패널티 적용 중입니다.');return;}
+  const b=curHotBiz;
+  const {collection,addDoc,serverTimestamp,Timestamp}=NW.fb;
+  const expires=Timestamp.fromMillis(nowMs()+DIRECT_TTL*1000);
+  try{
+    const ref=await addDoc(collection(NW.db,'nw_calls'),{
+      callerId:NW.uid, party:dcParty,
+      cats:[b.cat], cat:b.cat,
+      lat:myLoc.lat, lng:myLoc.lng,
+      directBizId:b.id, directBizName:b.name,   // 1:1 호출 표시
+      status:'searching', createdAt:serverTimestamp(), expiresAt:expires
+    });
+    dcCallId=ref.id;
+    $('dcTarget').textContent=b.name||'매장';
+    subShow('u-direct');
+    startDirectTimer();
+    listenDirectResponse(b.id);
+  }catch(e){toast('호출 실패: '+e.message);}
+};
+
+function startDirectTimer(){
+  const endAt = nowMs()+DIRECT_TTL*1000;
+  const total = DIRECT_TTL;
+  if(dcTimer) clearInterval(dcTimer);
+  const tick=()=>{
+    const left=Math.max(0,Math.ceil((endAt-nowMs())/1000));
+    $('dcSec').textContent=left;
+    const ring=$('dcRing');
+    if(ring){ const c=2*Math.PI*54; ring.style.strokeDasharray=c; ring.style.strokeDashoffset=c*(1-left/total); }
+    if(left<=0){ clearInterval(dcTimer); onDirectTimeout(); }
+  };
+  tick(); dcTimer=setInterval(tick,1000);
+}
+
+function listenDirectResponse(bizId){
+  if(dcUnsub) dcUnsub();
+  const {doc,onSnapshot,collection}=NW.fb;
+  // 호출 문서 감시(매장이 응답하면 status 변경) + responses 서브컬렉션 감시
+  const callRef=doc(NW.db,'nw_calls',dcCallId);
+  const u1=onSnapshot(callRef,s=>{
+    if(!s.exists())return;
+    const d=s.data();
+    if(d.status==='matched' && d.matchedBizId===bizId){
+      // 가능 응답 → 자동 매칭 확정 (사용자에게 매칭 화면)
+      onDirectAccepted(d);
+    }else if(d.status==='cancelled'||d.status==='expired'){
+      onDirectTimeout();
+    }
+  });
+  // 응답 서브컬렉션 감시 (불가/10분후/가능 모두)
+  const u2=onSnapshot(collection(NW.db,'nw_calls',dcCallId,'responses'),snap=>{
+    snap.forEach(d=>{
+      const r=d.data();
+      if(r.bizId!==bizId) return;
+      if(r.type==='no'){ onDirectRejected(); }
+      else if(r.type==='soon'){ onDirectSoon(r); }
+      // 'ok'는 매장이 별도로 matchedBizId 설정해야 매칭 확정. 매장 콘솔이 ok 응답 후 직접호출 자동 매칭 처리.
+    });
+  });
+  dcUnsub=()=>{u1();u2();};
+}
+
+async function onDirectAccepted(d){
+  cleanupDirect();
+  toast('🎉 매장이 받아줬어요!');
+  // 매칭 데이터 구성해서 기존 매칭 화면으로
+  matchData={callId:dcCallId, id:curHotBiz?.id, bizName:d.matchedBizName||curHotBiz?.name,
+    cat:curHotBiz?.cat, type:'ok', biz:curHotBiz};
+  curCallId=null;
+  openMatched(nowMs()+MATCH_TTL*1000);
+}
+function onDirectRejected(){
+  cleanupDirect();
+  cancelDirectDoc('cancelled');
+  toast('😢 죄송해요, 지금 자리가 없대요.');
+  subShow('u-hotdetail');
+}
+function onDirectSoon(r){
+  cleanupDirect();
+  cancelDirectDoc('cancelled');
+  toast('⏱ 매장이 "약 10분 후 가능"이라고 답했어요.');
+  subShow('u-hotdetail');
+}
+function onDirectTimeout(){
+  cleanupDirect();
+  cancelDirectDoc('expired');
+  toast('매장이 응답하지 않았어요. 다른 매장을 시도해보세요.');
+  subShow('u-hot');
+}
+window.cancelDirect=()=>{
+  cleanupDirect();
+  cancelDirectDoc('cancelled');
+  toast('호출을 취소했어요');
+  subShow('u-hotdetail');
+};
+function cleanupDirect(){
+  if(dcTimer){clearInterval(dcTimer);dcTimer=null;}
+  if(dcUnsub){dcUnsub();dcUnsub=null;}
+}
+async function cancelDirectDoc(status){
+  if(!dcCallId) return;
+  const {doc,updateDoc}=NW.fb;
+  try{ await updateDoc(doc(NW.db,'nw_calls',dcCallId),{status}); }catch(e){}
+  dcCallId=null;
+}
 
 /* 리뷰 시스템 — 도착완료한 매장에만 작성 가능, 1매장 1리뷰 */
 async function loadHotReviews(bizId){
