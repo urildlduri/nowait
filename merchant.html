@@ -274,10 +274,16 @@ window.saveEdit=async()=>{
 let arrUnsub=null, arrivals=[], arrTimer=null;
 function listenArrivals(){
   const {collection,query,where,onSnapshot}=NW.fb;
+  console.log('[listenArrivals] 시작 — myBizId:', myBizId);
   const q=query(collection(NW.db,'nw_calls'),where('matchedBizId','==',myBizId));
   arrUnsub=onSnapshot(q,snap=>{
-    arrivals=snap.docs.map(d=>({id:d.id,...d.data()})).filter(c=>['accepted','going','matched'].includes(c.status));
+    const all=snap.docs.map(d=>({id:d.id,...d.data()}));
+    arrivals=all.filter(c=>['accepted','going','matched'].includes(c.status));
+    console.log('[listenArrivals] 전체:',all.length,'/ 도착예정:',arrivals.length, all.map(c=>({status:c.status,id:c.id.slice(0,4)})));
     renderArrivals();
+  },err=>{
+    console.error('[listenArrivals] 오류:',err);
+    toast('도착예정 수신 오류: '+(err.code||err.message));
   });
   clearInterval(arrTimer);arrTimer=setInterval(renderArrivals,1000);
 }
@@ -317,10 +323,14 @@ window.confirmArrival=async(callId)=>{
   const name=c?.callerName||'손님';
   if(!confirm(`${name}님이 도착했나요?`))return;
   const {doc,updateDoc,serverTimestamp}=NW.fb;
+  console.log('[confirmArrival] callId:',callId,'myBizId:',myBizId,'matchedBizId:',c?.matchedBizId,'status:',c?.status);
   try{
     await updateDoc(doc(NW.db,'nw_calls',callId),{status:'done',arrivedAt:serverTimestamp()});
     toast('🎉 도착 확인 완료');
-  }catch(e){toast('실패: '+e.message);}
+  }catch(e){
+    console.error('[confirmArrival] 실패:',e);
+    toast('실패: '+(e.code||e.message||'알 수 없는 오류'));
+  }
 };
 window.markNoShow=async(callId)=>{
   const c=arrivals.find(x=>x.id===callId);
