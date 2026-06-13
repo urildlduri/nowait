@@ -22,7 +22,6 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.approved == false;
-      // 수정: 관리자 / 오너 / 멤버 / 또는 평점 필드만 갱신(리뷰 작성·삭제 시)
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerId == request.auth.uid
             && request.resource.data.approved == resource.data.approved)
@@ -37,7 +36,6 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 리뷰 (1매장 1사용자 — 문서 id가 bizId_uid)
     match /nw_reviews/{rid} {
       allow read: if signedIn();
       allow create, update: if signedIn()
@@ -50,10 +48,6 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.callerId == request.auth.uid;
-      // 호출 수정 허용:
-      // - 호출자 본인 (취소·갈게요·도착·노쇼 등 모든 상태 변경)
-      // - 로그인된 누구나 status를 '매칭/수락/진행/완료/노쇼/취소/만료' 중 하나로 설정 가능
-      //   (매장이 손님 매칭 응답 + 도착확인 + 노쇼 처리 등)
       allow update: if signedIn() && (
         resource.data.callerId == request.auth.uid
         || request.resource.data.status in ['matched','accepted','going','done','noshow','cancelled','expired']
