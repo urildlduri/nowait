@@ -197,9 +197,11 @@ function renderBiz(){
     return `<div class="adm-row"><div class="em">${cat.e}</div>
       <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[데모]</span>':''}</b>
       <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.ownerName||b.ownerEmail||'데모'} ${rating?'· '+rating:''}</small></div>
-      <span class="st ${st[1]}" style="margin-right:8px">${st[0]}</span>
-      ${hotBtn}
-      <button class="adm-btn danger" style="padding:6px 10px;margin-left:6px" onclick="reject('${b.id}','${(b.name||'').replace(/'/g,'')}')">삭제</button></div>`;}).join('');
+      <span class="st ${st[1]}">${st[0]}</span>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${hotBtn}
+        <button class="adm-btn danger" style="padding:6px 10px" onclick="reject('${b.id}','${(b.name||'').replace(/'/g,'')}')">삭제</button>
+      </div></div>`;}).join('');
 }
 
 window.toggleHot=async(id,on)=>{
