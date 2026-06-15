@@ -1117,19 +1117,50 @@ async function noShow(){
 async function saveHist(status){if(!NW.uid)return;
   const {collection,addDoc,serverTimestamp}=NW.fb;
   await addDoc(collection(NW.db,'nw_users',NW.uid,'history'),{
-    bizName:matchData?.bizName||'-',cat:sel.cats[0],party:sel.party,status,at:serverTimestamp()}).catch(()=>{});}
+    bizId:matchData?.id||matchData?.matchedBizId||'',
+    bizName:matchData?.bizName||'-',cat:matchData?.cat||sel.cats?.[0]||'',party:matchData?.party||sel.party,status,at:serverTimestamp()}).catch(()=>{});}
 async function renderMy(){
   renderPenaltyBannerMy();
   if(!NW.uid){$('myHist').innerHTML='<div class="muted">로컬 모드</div>';return;}
-  const {collection,getDocs,query,orderBy,limit}=NW.fb;
+  const {collection,getDocs,query,orderBy,limit,where}=NW.fb;
   const snap=await getDocs(query(collection(NW.db,'nw_users',NW.uid,'history'),orderBy('at','desc'),limit(20)));
   if(snap.empty){$('myHist').innerHTML='<div class="muted">아직 기록이 없어요.</div>';return;}
   const ST={done:['입장완료','var(--okbg)','var(--ok)'],noshow:['노쇼','var(--nobg)','var(--no)'],cancelled:['취소','var(--bg3)','var(--tx2)']};
+  // 1) 내가 쓴 리뷰 미리 조회 (있는지 표시용)
+  const myReviewed=new Set();
+  try{
+    const rSnap=await getDocs(query(collection(NW.db,'nw_reviews'),where('uid','==',NW.uid)));
+    rSnap.forEach(d=>myReviewed.add(d.data().bizId));
+  }catch(e){}
   $('myHist').innerHTML=snap.docs.map(d=>{const v=d.data();const s=ST[v.status]||ST.cancelled;const c=catOf(v.cat);
     const t=v.at?.toDate?v.at.toDate():new Date();
+    const canReview = v.status==='done' && v.bizId;
+    const alreadyReviewed = canReview && myReviewed.has(v.bizId);
+    let actionBtn='';
+    if(canReview && !alreadyReviewed){
+      actionBtn = `<button class="chip" style="margin-top:6px;padding:5px 10px;font-size:11px;color:var(--y);border-color:var(--y)" onclick="openReviewFromHist('${v.bizId}','${(v.bizName||'').replace(/'/g,'')}')">⭐ 리뷰 쓰기</button>`;
+    }else if(alreadyReviewed){
+      actionBtn = `<span style="margin-top:6px;display:inline-block;font-size:11px;color:var(--tx3)">✓ 리뷰 작성됨</span>`;
+    }
     return `<div class="hist-item"><div class="hi-l"><b>${c.e} ${v.bizName}</b>
-      <small>${v.party}명 · ${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</small></div>
+      <small>${v.party}명 · ${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</small>
+      ${actionBtn}</div>
       <span class="hs" style="background:${s[1]};color:${s[2]}">${s[0]}</span></div>`;}).join('');}
+
+/* MY 페이지에서 리뷰 작성 — 핫플 상세 화면으로 점프 */
+window.openReviewFromHist=async(bizId,bizName)=>{
+  if(!bizId){toast('매장 정보가 없어서 리뷰를 쓸 수 없어요');return;}
+  try{
+    const {doc,getDoc}=NW.fb;
+    const s=await getDoc(doc(NW.db,'nw_biz',bizId));
+    if(!s.exists()){toast('매장을 찾을 수 없어요. 폐업했거나 삭제됐을 수 있어요.');return;}
+    showHotDetail({id:bizId,...s.data()});
+    // 리뷰 섹션으로 자동 스크롤
+    setTimeout(()=>{
+      const el=$('hd-myreview'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'});
+    }, 300);
+  }catch(e){toast('실패: '+e.message);}
+};
 function renderPenaltyBannerMy(){const el=$('myStatus');
   if(penalActive()){const left=Math.ceil((penaltyUntil-nowMs())/60000);
     el.innerHTML=`<div class="penalty"><div class="pi">⛔</div><div><b>노쇼 패널티 적용 중</b><div class="pt">약 ${left}분 후 해제</div></div></div>`;}

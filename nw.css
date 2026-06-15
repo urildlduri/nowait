@@ -124,10 +124,11 @@ a{color:inherit;text-decoration:none}
 .penalty{background:var(--nobg);border:1px solid var(--no);border-radius:var(--rad);padding:16px;margin-top:14px;display:flex;align-items:center;gap:12px}
 .penalty .pi{font-size:24px}.penalty b{color:var(--no);font-size:14px}
 .penalty .pt{font-family:var(--mono);color:var(--no);font-weight:800}
-.hist-item{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad);padding:13px 15px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.hist-item{background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad);padding:13px 15px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.hist-item .hi-l{flex:1;min-width:0}
 .hist-item .hi-l b{font-size:14px;font-weight:700}
 .hist-item .hi-l small{display:block;color:var(--tx3);font-size:11px;font-family:var(--mono);margin-top:2px}
-.hist-item .hs{font-size:11px;font-weight:800;padding:4px 9px;border-radius:6px}
+.hist-item .hs{font-size:11px;font-weight:800;padding:4px 9px;border-radius:6px;white-space:nowrap;flex-shrink:0}
 
 /* 점주 태블릿 */
 .tab-top{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:40}
