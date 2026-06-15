@@ -323,7 +323,18 @@ window.confirmArrival=async(callId)=>{
   const name=c?.callerName||'손님';
   if(!confirm(`${name}님이 도착했나요?`))return;
   const {doc,updateDoc,serverTimestamp}=NW.fb;
-  console.log('[confirmArrival] callId:',callId,'myBizId:',myBizId,'matchedBizId:',c?.matchedBizId,'status:',c?.status);
+  // 진단 — 인증 상태 출력
+  const u=NW.auth.currentUser;
+  console.log('=== 진단 정보 ===');
+  console.log('현재 사용자 uid:', u?.uid);
+  console.log('현재 사용자 email:', u?.email);
+  console.log('익명 여부:', u?.isAnonymous);
+  console.log('callId:', callId);
+  console.log('호출 callerId:', c?.callerId, '→ 나와 같음?', c?.callerId===u?.uid);
+  console.log('호출 matchedBizId:', c?.matchedBizId, '→ 내 매장?', c?.matchedBizId===myBizId);
+  console.log('호출 status:', c?.status);
+  console.log('매장 ownerId:', myBiz?.ownerId, '→ 나와 같음?', myBiz?.ownerId===u?.uid);
+  console.log('==============');
   try{
     await updateDoc(doc(NW.db,'nw_calls',callId),{status:'done',arrivedAt:serverTimestamp()});
     toast('🎉 도착 확인 완료');
