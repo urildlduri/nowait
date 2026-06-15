@@ -51,8 +51,22 @@
       <button class="status-btn s-busy" id="st-busy" onclick="setBizStatus('busy')"><span class="si">🟡</span>혼잡</button>
       <button class="status-btn s-close" id="st-close" onclick="setBizStatus('closed')"><span class="si">🔴</span>마감</button>
     </div>
+    <!-- 이번 달 통계 -->
+    <div class="h2" style="font-size:15px;margin-top:14px;display:flex;justify-content:space-between;align-items:baseline">
+      <span>📊 <span id="statMonthLb">이번 달</span></span>
+      <span class="muted" style="font-size:11px;font-weight:600" id="statMonthDates">--</span>
+    </div>
     <div class="tab-stats">
-      <div class="tab-stat"><div class="n mono" id="tsCalls">0</div><div class="l">오늘 받은 호출</div></div>
+      <div class="tab-stat"><div class="n mono" id="mCalls">0</div><div class="l">호출</div></div>
+      <div class="tab-stat"><div class="n mono" id="mResp">0</div><div class="l">응답</div></div>
+      <div class="tab-stat"><div class="n mono" id="mMatch">0</div><div class="l">성사</div></div>
+      <div class="tab-stat"><div class="n mono" id="mDone" style="color:var(--ok)">0</div><div class="l">도착</div></div>
+      <div class="tab-stat"><div class="n mono" id="mNoshow" style="color:var(--no)">0</div><div class="l">노쇼</div></div>
+    </div>
+    <!-- 오늘 -->
+    <div class="h2" style="font-size:15px;margin-top:14px">🔴 오늘</div>
+    <div class="tab-stats">
+      <div class="tab-stat"><div class="n mono" id="tsCalls">0</div><div class="l">호출</div></div>
       <div class="tab-stat"><div class="n mono" id="tsResp">0</div><div class="l">응답</div></div>
       <div class="tab-stat"><div class="n mono" id="tsMatch">0</div><div class="l">성사</div></div>
     </div>
@@ -157,7 +171,7 @@ function openConsole(){
   // 직원 관리 버튼은 오너에게만 보임
   const memBtn=$('memBtn');
   if(memBtn) memBtn.classList.toggle('hide', myBiz.ownerId!==NW.uid);
-  setBizStatus(myBiz.status,true); listenCalls(); listenArrivals();
+  setBizStatus(myBiz.status,true); listenCalls(); listenArrivals(); loadMonthStats();
 }
 
 /* ── 직원(멤버) 관리 ── 오너만 */
@@ -281,11 +295,93 @@ function listenArrivals(){
     arrivals=all.filter(c=>['accepted','going','matched'].includes(c.status));
     console.log('[listenArrivals] 전체:',all.length,'/ 도착예정:',arrivals.length, all.map(c=>({status:c.status,id:c.id.slice(0,4)})));
     renderArrivals();
+    // 도착/노쇼/매칭 발생 시 통계 갱신
+    updateMonthStatsFromArrivalsSnapshot(all);
   },err=>{
     console.error('[listenArrivals] 오류:',err);
     toast('도착예정 수신 오류: '+(err.code||err.message));
   });
   clearInterval(arrTimer);arrTimer=setInterval(renderArrivals,1000);
+}
+
+/* 이번 달 통계 — nw_calls 중 matchedBizId=myBizId & 이번 달 생성 */
+let monthStatsCache=null;
+async function loadMonthStats(){
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd=new Date(now.getFullYear(), now.getMonth()+1, 1);
+  $('statMonthLb').textContent=`이번 달 (${now.getMonth()+1}월)`;
+  $('statMonthDates').textContent=`${monthStart.getMonth()+1}/1 ~ ${now.getMonth()+1}/${now.getDate()}`;
+  // 응답한 호출(호출 자체) 카운트 — 매장이 응답한 모든 호출
+  // matchedBizId로는 매칭 성공만 잡힘. 응답만 한 호출은 nw_calls/{id}/responses/{myBizId}에 있음.
+  try{
+    const {collection,query,where,getDocs,Timestamp}=NW.fb;
+    const startTs=Timestamp.fromDate(monthStart);
+    // 1) 매칭된 호출 (matchedBizId == myBizId) — 매칭/도착/노쇼 카운트
+    const matchedSnap=await getDocs(query(collection(NW.db,'nw_calls'),where('matchedBizId','==',myBizId)));
+    let mMatch=0, mDone=0, mNoshow=0;
+    matchedSnap.forEach(d=>{
+      const c=d.data();
+      const at=c.matchedAt||c.acceptedAt||c.createdAt;
+      if(!at||!at.toMillis||at.toMillis()<monthStart.getTime())return;
+      mMatch++;
+      if(c.status==='done') mDone++;
+      else if(c.status==='noshow') mNoshow++;
+    });
+    // 2) 응답한 호출 — collectionGroup으로 responses 모음 (가능하면)
+    // 대안: 응답 카운트는 단순화 — 매칭+노쇼+도착=응답으로 간주 (단순 정확치 아닐 수 있음)
+    // 더 정확하게 하려면 nw_calls 중 cat가 내 매장 cat인 것 + 반경 안 호출을 다 카운트해야 하나 비용이 큼
+    // 일단 매칭(matched) 카운트는 정확. 호출/응답은 오늘 카운터에 의존하고 월간은 매칭 중심으로 표시.
+    $('mMatch').textContent=mMatch;
+    $('mDone').textContent=mDone;
+    $('mNoshow').textContent=mNoshow;
+    // 호출/응답은 오늘 stats를 누적 추정으로 표시 (매장이 콘솔 열고 있는 동안만 정확)
+    // 실제 누적은 어차피 매칭 기준이 의미 있음
+    monthStatsCache={mMatch,mDone,mNoshow};
+    // 호출/응답은 nw_calls의 responses 서브컬렉션을 collectionGroup으로 잡아야 정확
+    await loadMonthResponses(monthStart);
+  }catch(e){
+    console.warn('[loadMonthStats] 실패:',e);
+  }
+}
+
+async function loadMonthResponses(monthStart){
+  // collectionGroup으로 매장의 responses 모음
+  try{
+    const {collectionGroup,query,where,getDocs}=NW.fb;
+    const snap=await getDocs(query(collectionGroup(NW.db,'responses'),where('bizId','==',myBizId)));
+    let calls=0, resp=0;
+    snap.forEach(d=>{
+      const r=d.data();
+      const at=r.at;
+      if(!at||!at.toMillis||at.toMillis()<monthStart.getTime())return;
+      calls++; // 호출이 들어와서 응답을 보낸 매장 입장에서의 카운트
+      if(r.type!=='no') resp++;
+    });
+    $('mCalls').textContent=calls;
+    $('mResp').textContent=resp;
+  }catch(e){
+    console.warn('[loadMonthResponses] 실패 — 호출/응답 카운트 미표시:',e.code);
+    // collectionGroup 인덱스 없는 경우엔 0 유지
+  }
+}
+
+function updateMonthStatsFromArrivalsSnapshot(all){
+  if(!monthStatsCache) return;
+  const now=new Date();
+  const monthStart=new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  let mMatch=0, mDone=0, mNoshow=0;
+  all.forEach(c=>{
+    const at=c.matchedAt||c.acceptedAt||c.createdAt;
+    if(!at||!at.toMillis||at.toMillis()<monthStart)return;
+    mMatch++;
+    if(c.status==='done') mDone++;
+    else if(c.status==='noshow') mNoshow++;
+  });
+  $('mMatch').textContent=mMatch;
+  $('mDone').textContent=mDone;
+  $('mNoshow').textContent=mNoshow;
+  monthStatsCache={mMatch,mDone,mNoshow};
 }
 function renderArrivals(){
   const area=$('arrArea');
