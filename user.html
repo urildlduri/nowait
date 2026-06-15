@@ -95,7 +95,9 @@
     <div class="page">
       <div class="h1">MY</div>
       <div id="myStatus"></div>
-      <div class="h2" style="margin-top:26px">호출 기록</div>
+      <div class="h2" style="margin-top:24px">🏆 포인트</div>
+      <div id="myPoints"></div>
+      <div class="h2" style="margin-top:24px">호출 기록</div>
       <div id="myHist"><div class="muted">아직 기록이 없어요.</div></div>
 
       <div class="sec-divider"></div>
@@ -576,6 +578,7 @@ window.confirmGoing=async()=>{
       status:'going', goingAt:serverTimestamp(), matchExpiresAt:matchExp
     });
     toast('🚶 갈게요! 15분 안에 도착하세요.');
+    await awardPoints(20, '호출 성사');
     openMatched(nowMs()+MATCH_TTL*1000);
   }catch(e){toast('실패: '+e.message);}
 };
@@ -697,9 +700,12 @@ window.pickStar=n=>{
 window.submitReview=async(bizId)=>{
   if(!rvRating){toast('별점을 선택해 주세요');return;}
   const text=$('rvText').value.trim();
-  const {doc,setDoc,serverTimestamp,getDocs,collection,query,where,updateDoc}=NW.fb;
+  const {doc,setDoc,getDoc,serverTimestamp,getDocs,collection,query,where,updateDoc}=NW.fb;
   const reviewId=`${bizId}_${NW.uid}`;
   try{
+    // 신규 작성인지 확인 (이미 있으면 수정만, 포인트 X)
+    const existing = await getDoc(doc(NW.db,'nw_reviews',reviewId));
+    const isNew = !existing.exists();
     await setDoc(doc(NW.db,'nw_reviews',reviewId),{
       bizId, bizName:curHotBiz?.name||'', uid:NW.uid,
       userName:NW.user?.displayName||'', rating:rvRating, text, at:serverTimestamp()
@@ -707,6 +713,7 @@ window.submitReview=async(bizId)=>{
     // 매장 평균 갱신
     await updateBizRating(bizId);
     toast('리뷰가 등록됐어요. 감사합니다!');
+    if(isNew) await awardPoints(50, '리뷰 작성');
     rvRating=0; loadHotReviews(bizId);
   }catch(e){toast('실패: '+e.message);}
 };
@@ -972,6 +979,7 @@ window.confirmMatch=async()=>{
       matchedAt:serverTimestamp(), goingAt:serverTimestamp(), matchExpiresAt:matchExp});
     matchData={callId:curCallId,...r,biz:detailBiz, party:sel.party};
     cleanupCall();
+    await awardPoints(20, '호출 성사');
     openMatched(nowMs()+MATCH_TTL*1000);
   }catch(e){
     console.error('[confirmMatch] 실패:',e);
@@ -1118,15 +1126,61 @@ async function saveHist(status){if(!NW.uid)return;
   const {collection,addDoc,serverTimestamp}=NW.fb;
   await addDoc(collection(NW.db,'nw_users',NW.uid,'history'),{
     bizId:matchData?.id||matchData?.matchedBizId||'',
-    bizName:matchData?.bizName||'-',cat:matchData?.cat||sel.cats?.[0]||'',party:matchData?.party||sel.party,status,at:serverTimestamp()}).catch(()=>{});}
+    bizName:matchData?.bizName||'-',cat:matchData?.cat||sel.cats?.[0]||'',party:matchData?.party||sel.party,status,at:serverTimestamp()}).catch(()=>{});
+  // 포인트 적립/차감
+  const POINT_TABLE = { matched:20, done:100, noshow:-200, cancelled:0 };
+  const REASON_TABLE = { matched:'호출 성사', done:'도착 완료', noshow:'노쇼', cancelled:'취소' };
+  const pts = POINT_TABLE[status];
+  if(pts) await awardPoints(pts, REASON_TABLE[status]);
+}
+
+/* 포인트 시스템 */
+let userPoints = 0;
+async function awardPoints(delta, reason){
+  if(!NW.uid || !delta) return;
+  const {doc,getDoc,setDoc,serverTimestamp,collection,addDoc,increment}=NW.fb;
+  try{
+    // 사용자 문서에 포인트 누적 (increment 사용)
+    const userRef=doc(NW.db,'nw_users',NW.uid);
+    const inc = NW.fb.increment ? NW.fb.increment(delta) : delta;
+    // increment가 없으면 트랜잭션 없이 단순 가산
+    if(NW.fb.increment){
+      await setDoc(userRef,{points:NW.fb.increment(delta)},{merge:true});
+    }else{
+      // 수동 가산 (경합 가능하지만 단일 사용자라 문제 없음)
+      const s=await getDoc(userRef);
+      const cur = s.exists() && s.data().points ? s.data().points : 0;
+      await setDoc(userRef,{points:cur+delta},{merge:true});
+    }
+    // 포인트 로그 (서브컬렉션)
+    await addDoc(collection(NW.db,'nw_users',NW.uid,'points'),{
+      delta, reason, balance:null, at:serverTimestamp()
+    }).catch(()=>{});
+    // 토스트로 알림
+    const emoji = delta>0 ? '💰' : '📉';
+    toast(`${emoji} ${reason} ${delta>0?'+':''}${delta}P`);
+  }catch(e){console.warn('[awardPoints] 실패:',e);}
+}
+
+async function loadPoints(){
+  if(!NW.uid) { userPoints=0; return; }
+  try{
+    const {doc,getDoc}=NW.fb;
+    const s=await getDoc(doc(NW.db,'nw_users',NW.uid));
+    userPoints = (s.exists() && s.data().points) || 0;
+  }catch(e){userPoints=0;}
+}
+
 async function renderMy(){
   renderPenaltyBannerMy();
+  await loadPoints();
+  await renderPointsBlock();
   if(!NW.uid){$('myHist').innerHTML='<div class="muted">로컬 모드</div>';return;}
   const {collection,getDocs,query,orderBy,limit,where}=NW.fb;
   const snap=await getDocs(query(collection(NW.db,'nw_users',NW.uid,'history'),orderBy('at','desc'),limit(20)));
   if(snap.empty){$('myHist').innerHTML='<div class="muted">아직 기록이 없어요.</div>';return;}
   const ST={done:['입장완료','var(--okbg)','var(--ok)'],noshow:['노쇼','var(--nobg)','var(--no)'],cancelled:['취소','var(--bg3)','var(--tx2)']};
-  // 1) 내가 쓴 리뷰 미리 조회 (있는지 표시용)
+  // 1) 내가 쓴 리뷰 미리 조회
   const myReviewed=new Set();
   try{
     const rSnap=await getDocs(query(collection(NW.db,'nw_reviews'),where('uid','==',NW.uid)));
@@ -1138,7 +1192,7 @@ async function renderMy(){
     const alreadyReviewed = canReview && myReviewed.has(v.bizId);
     let actionBtn='';
     if(canReview && !alreadyReviewed){
-      actionBtn = `<button class="chip" style="margin-top:6px;padding:5px 10px;font-size:11px;color:var(--y);border-color:var(--y)" onclick="openReviewFromHist('${v.bizId}','${(v.bizName||'').replace(/'/g,'')}')">⭐ 리뷰 쓰기</button>`;
+      actionBtn = `<button class="chip" style="margin-top:6px;padding:5px 10px;font-size:11px;color:var(--y);border-color:var(--y)" onclick="openReviewFromHist('${v.bizId}','${(v.bizName||'').replace(/'/g,'')}')">⭐ 리뷰 쓰기 (+50P)</button>`;
     }else if(alreadyReviewed){
       actionBtn = `<span style="margin-top:6px;display:inline-block;font-size:11px;color:var(--tx3)">✓ 리뷰 작성됨</span>`;
     }
@@ -1146,6 +1200,40 @@ async function renderMy(){
       <small>${v.party}명 · ${t.getMonth()+1}/${t.getDate()} ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}</small>
       ${actionBtn}</div>
       <span class="hs" style="background:${s[1]};color:${s[2]}">${s[0]}</span></div>`;}).join('');}
+
+async function renderPointsBlock(){
+  // 최근 10개 포인트 내역
+  let log=[];
+  if(NW.uid){
+    try{
+      const {collection,getDocs,query,orderBy,limit}=NW.fb;
+      const snap=await getDocs(query(collection(NW.db,'nw_users',NW.uid,'points'),orderBy('at','desc'),limit(10)));
+      log=snap.docs.map(d=>d.data());
+    }catch(e){}
+  }
+  const recent = log.map(p=>{
+    const t=p.at?.toDate?p.at.toDate():new Date();
+    const sign = p.delta>0?'+':'';
+    const color = p.delta>0?'var(--ok)':'var(--no)';
+    return `<div style="display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid var(--bd)">
+      <span style="color:var(--tx2)">${p.reason||''} · ${t.getMonth()+1}/${t.getDate()}</span>
+      <b style="color:${color}">${sign}${p.delta}P</b></div>`;
+  }).join('') || '<div class="muted" style="font-size:12px;padding:8px 0">아직 포인트 내역이 없어요.</div>';
+  $('myPoints').innerHTML=`
+    <div class="statbox" style="margin-top:0">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--tx2);font-size:13px">🏆 보유 포인트</span>
+        <b style="color:var(--y);font-size:24px">${userPoints.toLocaleString()}<span style="font-size:14px;margin-left:2px">P</span></b>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:6px">도착완료 +100P · 리뷰작성 +50P · 호출성사 +20P · 노쇼 -200P</div>
+      <div style="margin-top:12px">${recent}</div>
+    </div>`;
+}
+
+function renderPenaltyBannerMy(){const el=$('myStatus');
+  if(penalActive()){const left=Math.ceil((penaltyUntil-nowMs())/60000);
+    el.innerHTML=`<div class="penalty"><div class="pi">⛔</div><div><b>노쇼 패널티 적용 중</b><div class="pt">약 ${left}분 후 해제</div></div></div>`;}
+  else el.innerHTML=`<div class="statbox"><b style="color:var(--ok)">✓ 정상 이용 가능</b><div class="muted" style="margin-top:6px">패널티 없음</div></div>`;}
 
 /* MY 페이지에서 리뷰 작성 — 핫플 상세 화면으로 점프 */
 window.openReviewFromHist=async(bizId,bizName)=>{
