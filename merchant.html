@@ -36,6 +36,7 @@
     <div class="lg">NO<span class="w">WAIT</span> <span style="font-size:13px;color:var(--tx3);font-weight:700">매장 콘솔</span></div>
     <div style="display:flex;align-items:center;gap:16px">
       <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
+      <button class="adm-btn" style="padding:8px 12px;font-size:12px" onclick="openStats()">📊 통계</button>
       <button class="adm-btn" style="padding:8px 12px;font-size:12px" onclick="openEdit()">⚙ 매장 수정</button>
       <button class="adm-btn" id="alarmBtn" style="padding:8px 12px;font-size:12px" onclick="toggleAlarm()">🔔 알람 OFF</button>
       <button class="adm-btn hide" id="memBtn" style="padding:8px 12px;font-size:12px" onclick="openMembers()">👥 직원</button>
@@ -51,22 +52,9 @@
       <button class="status-btn s-busy" id="st-busy" onclick="setBizStatus('busy')"><span class="si">🟡</span>혼잡</button>
       <button class="status-btn s-close" id="st-close" onclick="setBizStatus('closed')"><span class="si">🔴</span>마감</button>
     </div>
-    <!-- 이번 달 통계 -->
-    <div class="h2" style="font-size:15px;margin-top:14px;display:flex;justify-content:space-between;align-items:baseline">
-      <span>📊 <span id="statMonthLb">이번 달</span></span>
-      <span class="muted" style="font-size:11px;font-weight:600" id="statMonthDates">--</span>
-    </div>
+    <!-- 오늘 카운터 -->
     <div class="tab-stats">
-      <div class="tab-stat"><div class="n mono" id="mCalls">0</div><div class="l">호출</div></div>
-      <div class="tab-stat"><div class="n mono" id="mResp">0</div><div class="l">응답</div></div>
-      <div class="tab-stat"><div class="n mono" id="mMatch">0</div><div class="l">성사</div></div>
-      <div class="tab-stat"><div class="n mono" id="mDone" style="color:var(--ok)">0</div><div class="l">도착</div></div>
-      <div class="tab-stat"><div class="n mono" id="mNoshow" style="color:var(--no)">0</div><div class="l">노쇼</div></div>
-    </div>
-    <!-- 오늘 -->
-    <div class="h2" style="font-size:15px;margin-top:14px">🔴 오늘</div>
-    <div class="tab-stats">
-      <div class="tab-stat"><div class="n mono" id="tsCalls">0</div><div class="l">호출</div></div>
+      <div class="tab-stat"><div class="n mono" id="tsCalls">0</div><div class="l">오늘 받은 호출</div></div>
       <div class="tab-stat"><div class="n mono" id="tsResp">0</div><div class="l">응답</div></div>
       <div class="tab-stat"><div class="n mono" id="tsMatch">0</div><div class="l">성사</div></div>
     </div>
@@ -128,6 +116,46 @@
     <div class="field"><div class="field-lb">현재 멤버</div><div id="memList"></div></div>
   </div>
 </div>
+<div id="m-stats" class="scr" style="position:relative;z-index:50;background:var(--bg);min-height:100vh">
+  <div class="setup">
+    <div style="margin-bottom:8px"><button class="back" onclick="subShow('m-console')" style="background:none;color:var(--tx2);font-weight:700">← 콘솔로</button></div>
+    <div class="brand" style="font-size:30px">📊 매장 통계</div>
+    <div class="brand-sub" style="text-align:left;margin-top:8px" id="stPeriod">--</div>
+
+    <div class="h2" style="font-size:17px;margin-top:30px">이번 달 (<span id="stMonthLb">--</span>)</div>
+    <div class="tab-stats">
+      <div class="tab-stat"><div class="n mono" id="mCalls">0</div><div class="l">호출 수신</div></div>
+      <div class="tab-stat"><div class="n mono" id="mResp">0</div><div class="l">응답</div></div>
+      <div class="tab-stat"><div class="n mono" id="mMatch">0</div><div class="l">매칭 성사</div></div>
+    </div>
+    <div class="tab-stats" style="margin-top:10px">
+      <div class="tab-stat"><div class="n mono" id="mDone" style="color:var(--ok)">0</div><div class="l">도착 완료</div></div>
+      <div class="tab-stat"><div class="n mono" id="mNoshow" style="color:var(--no)">0</div><div class="l">노쇼</div></div>
+      <div class="tab-stat"><div class="n mono" id="mNoshowRate">0%</div><div class="l">노쇼율</div></div>
+    </div>
+
+    <div class="h2" style="font-size:17px;margin-top:30px">전체 누적</div>
+    <div class="tab-stats">
+      <div class="tab-stat"><div class="n mono" id="aMatch">0</div><div class="l">매칭 성사</div></div>
+      <div class="tab-stat"><div class="n mono" id="aDone" style="color:var(--ok)">0</div><div class="l">도착 완료</div></div>
+      <div class="tab-stat"><div class="n mono" id="aNoshow" style="color:var(--no)">0</div><div class="l">노쇼</div></div>
+    </div>
+
+    <div class="h2" style="font-size:17px;margin-top:30px">평가</div>
+    <div class="statbox" style="margin-top:0">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--tx2)">평균 별점</span>
+        <b style="color:var(--y);font-size:20px" id="stRating">--</b>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+        <span style="color:var(--tx2)">리뷰 수</span>
+        <b id="stRatingCount">0</b>
+      </div>
+    </div>
+
+    <div class="muted" style="font-size:12px;margin-top:18px;text-align:center">매장 콘솔이 열려있는 동안 실시간으로 누적됩니다.</div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script src="nw-core.js"></script>
@@ -171,7 +199,7 @@ function openConsole(){
   // 직원 관리 버튼은 오너에게만 보임
   const memBtn=$('memBtn');
   if(memBtn) memBtn.classList.toggle('hide', myBiz.ownerId!==NW.uid);
-  setBizStatus(myBiz.status,true); listenCalls(); listenArrivals(); loadMonthStats();
+  setBizStatus(myBiz.status,true); listenCalls(); listenArrivals();
 }
 
 /* ── 직원(멤버) 관리 ── 오너만 */
@@ -295,8 +323,6 @@ function listenArrivals(){
     arrivals=all.filter(c=>['accepted','going','matched'].includes(c.status));
     console.log('[listenArrivals] 전체:',all.length,'/ 도착예정:',arrivals.length, all.map(c=>({status:c.status,id:c.id.slice(0,4)})));
     renderArrivals();
-    // 도착/노쇼/매칭 발생 시 통계 갱신
-    updateMonthStatsFromArrivalsSnapshot(all);
   },err=>{
     console.error('[listenArrivals] 오류:',err);
     toast('도착예정 수신 오류: '+(err.code||err.message));
@@ -304,41 +330,49 @@ function listenArrivals(){
   clearInterval(arrTimer);arrTimer=setInterval(renderArrivals,1000);
 }
 
-/* 이번 달 통계 — nw_calls 중 matchedBizId=myBizId & 이번 달 생성 */
-let monthStatsCache=null;
+window.openStats=()=>{
+  subShow('m-stats');
+  loadMonthStats();
+};
+
+/* 매장 통계 — 이번 달 + 누적 */
 async function loadMonthStats(){
   const now=new Date();
   const monthStart=new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd=new Date(now.getFullYear(), now.getMonth()+1, 1);
-  $('statMonthLb').textContent=`이번 달 (${now.getMonth()+1}월)`;
-  $('statMonthDates').textContent=`${monthStart.getMonth()+1}/1 ~ ${now.getMonth()+1}/${now.getDate()}`;
-  // 응답한 호출(호출 자체) 카운트 — 매장이 응답한 모든 호출
-  // matchedBizId로는 매칭 성공만 잡힘. 응답만 한 호출은 nw_calls/{id}/responses/{myBizId}에 있음.
+  $('stMonthLb').textContent=`${now.getMonth()+1}월`;
+  $('stPeriod').textContent=`${monthStart.getMonth()+1}/1 ~ ${now.getMonth()+1}/${now.getDate()} 기준`;
+  // 평균 별점
+  $('stRating').textContent=myBiz.ratingAvg?(+myBiz.ratingAvg).toFixed(1)+' ⭐':'아직 없음';
+  $('stRatingCount').textContent=myBiz.ratingCount||0;
   try{
-    const {collection,query,where,getDocs,Timestamp}=NW.fb;
-    const startTs=Timestamp.fromDate(monthStart);
-    // 1) 매칭된 호출 (matchedBizId == myBizId) — 매칭/도착/노쇼 카운트
+    const {collection,query,where,getDocs}=NW.fb;
+    // 매칭된 호출 전체
     const matchedSnap=await getDocs(query(collection(NW.db,'nw_calls'),where('matchedBizId','==',myBizId)));
-    let mMatch=0, mDone=0, mNoshow=0;
+    let mMatch=0, mDone=0, mNoshow=0;     // 이번 달
+    let aMatch=0, aDone=0, aNoshow=0;     // 누적
     matchedSnap.forEach(d=>{
       const c=d.data();
+      aMatch++;
+      if(c.status==='done') aDone++;
+      else if(c.status==='noshow') aNoshow++;
       const at=c.matchedAt||c.acceptedAt||c.createdAt;
-      if(!at||!at.toMillis||at.toMillis()<monthStart.getTime())return;
-      mMatch++;
-      if(c.status==='done') mDone++;
-      else if(c.status==='noshow') mNoshow++;
+      if(at?.toMillis && at.toMillis()>=monthStart.getTime()){
+        mMatch++;
+        if(c.status==='done') mDone++;
+        else if(c.status==='noshow') mNoshow++;
+      }
     });
-    // 2) 응답한 호출 — collectionGroup으로 responses 모음 (가능하면)
-    // 대안: 응답 카운트는 단순화 — 매칭+노쇼+도착=응답으로 간주 (단순 정확치 아닐 수 있음)
-    // 더 정확하게 하려면 nw_calls 중 cat가 내 매장 cat인 것 + 반경 안 호출을 다 카운트해야 하나 비용이 큼
-    // 일단 매칭(matched) 카운트는 정확. 호출/응답은 오늘 카운터에 의존하고 월간은 매칭 중심으로 표시.
     $('mMatch').textContent=mMatch;
     $('mDone').textContent=mDone;
     $('mNoshow').textContent=mNoshow;
-    // 호출/응답은 오늘 stats를 누적 추정으로 표시 (매장이 콘솔 열고 있는 동안만 정확)
-    // 실제 누적은 어차피 매칭 기준이 의미 있음
-    monthStatsCache={mMatch,mDone,mNoshow};
-    // 호출/응답은 nw_calls의 responses 서브컬렉션을 collectionGroup으로 잡아야 정확
+    $('aMatch').textContent=aMatch;
+    $('aDone').textContent=aDone;
+    $('aNoshow').textContent=aNoshow;
+    // 노쇼율 = 노쇼 / 매칭 성사
+    const rate = mMatch>0 ? Math.round(mNoshow/mMatch*100) : 0;
+    $('mNoshowRate').textContent=rate+'%';
+    $('mNoshowRate').style.color = rate>20?'var(--no)':rate>10?'var(--soon)':'var(--tx2)';
+    // 응답한 호출 카운트 (collectionGroup)
     await loadMonthResponses(monthStart);
   }catch(e){
     console.warn('[loadMonthStats] 실패:',e);
@@ -346,7 +380,6 @@ async function loadMonthStats(){
 }
 
 async function loadMonthResponses(monthStart){
-  // collectionGroup으로 매장의 responses 모음
   try{
     const {collectionGroup,query,where,getDocs}=NW.fb;
     const snap=await getDocs(query(collectionGroup(NW.db,'responses'),where('bizId','==',myBizId)));
@@ -354,34 +387,20 @@ async function loadMonthResponses(monthStart){
     snap.forEach(d=>{
       const r=d.data();
       const at=r.at;
-      if(!at||!at.toMillis||at.toMillis()<monthStart.getTime())return;
-      calls++; // 호출이 들어와서 응답을 보낸 매장 입장에서의 카운트
+      if(!at?.toMillis || at.toMillis()<monthStart.getTime())return;
+      calls++;
       if(r.type!=='no') resp++;
     });
     $('mCalls').textContent=calls;
     $('mResp').textContent=resp;
   }catch(e){
-    console.warn('[loadMonthResponses] 실패 — 호출/응답 카운트 미표시:',e.code);
-    // collectionGroup 인덱스 없는 경우엔 0 유지
+    console.warn('[loadMonthResponses] 실패:',e.code);
+    // 인덱스 없을 시 에러 안내
+    if(e.code==='failed-precondition'){
+      $('mCalls').textContent='-';
+      $('mResp').textContent='-';
+    }
   }
-}
-
-function updateMonthStatsFromArrivalsSnapshot(all){
-  if(!monthStatsCache) return;
-  const now=new Date();
-  const monthStart=new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  let mMatch=0, mDone=0, mNoshow=0;
-  all.forEach(c=>{
-    const at=c.matchedAt||c.acceptedAt||c.createdAt;
-    if(!at||!at.toMillis||at.toMillis()<monthStart)return;
-    mMatch++;
-    if(c.status==='done') mDone++;
-    else if(c.status==='noshow') mNoshow++;
-  });
-  $('mMatch').textContent=mMatch;
-  $('mDone').textContent=mDone;
-  $('mNoshow').textContent=mNoshow;
-  monthStatsCache={mMatch,mDone,mNoshow};
 }
 function renderArrivals(){
   const area=$('arrArea');
