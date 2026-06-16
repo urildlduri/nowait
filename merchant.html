@@ -600,7 +600,7 @@ function callCard(c){const cat=catOf(c.cat);const done=respondedCalls.has(c.id);
   if(done)action=`<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>`;
   else if(myBiz.status==='busy')action=`<div class="resp-row"><button class="resp-btn rb-soon" onclick="respond('${c.id}','soon')">10분 후</button><button class="resp-btn rb-no" onclick="respond('${c.id}','no')">불가</button></div>`;
   else action=`<div class="resp-row"><button class="resp-btn rb-ok" onclick="respond('${c.id}','ok')">가능</button><button class="resp-btn rb-soon" onclick="respond('${c.id}','soon')">10분 후</button><button class="resp-btn rb-no" onclick="respond('${c.id}','no')">불가</button></div>`;
-  const directBadge = isDirect ? `<div style="position:absolute;top:8px;right:8px;background:var(--y);color:#000;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px">📞 직접호출</div>` : '';
+  const directBadge = isDirect ? `<div style="position:absolute;top:8px;right:8px;background:var(--y);color:#fff;font-size:11px;font-weight:800;padding:3px 8px;border-radius:6px">📞 직접호출</div>` : '';
   return `<div class="callcard fresh" id="call-${c.id}" style="position:relative">${directBadge}<div class="ch"><div class="party">${c.party}<span>명</span></div><div class="dist mono">${distLabel(c._dist)}</div></div>
     <div class="cmeta">${cat.e} ${cat.n} 요청${isDirect?' · 본 매장 지목':''}</div><div class="ctimer mono" id="ct-${c.id}">⏱ 대기중</div>${action}</div>`;}
 function startCallTimer(id,exp){if(callTimers[id])return;

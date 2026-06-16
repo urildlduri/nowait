@@ -7,6 +7,17 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="nw.css">
+<style>
+.ring-wrap{display:flex;align-items:center;gap:16px;margin-top:24px;justify-content:center}
+.ring{position:relative;width:120px;height:120px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:var(--bg3);stroke-width:8}
+.ring-fg{fill:none;stroke:var(--y);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .5s}
+.ring-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--mono);font-weight:800}
+.ring-num span{font-size:28px;color:var(--y)}.ring-num small{font-size:11px;color:var(--tx3);margin-top:-2px}
+.ring-info{flex:1}.ring-info b{display:block;font-size:14px;font-weight:800}.ring-info small{color:var(--tx3);font-size:12px}
+.sec-divider{height:1px;background:var(--bd);margin:24px 0}
+</style>
 </head>
 <body>
 <div id="cfgWarn" class="hide"></div>

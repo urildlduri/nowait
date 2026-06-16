@@ -8,10 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="nw.css">
 <style>
-#splash{position:fixed;inset:0;background:#0E0E10;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;transition:opacity .5s}
+#splash{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;transition:opacity .5s}
 #splash .brand{font-size:60px;animation:pop .7s cubic-bezier(.2,1.2,.4,1)}
 @keyframes pop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
-.gbtn{background:#fff;color:#1f1f1f;font-weight:700;font-size:16px;padding:15px 22px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;max-width:340px;transition:.12s}
+.gbtn{background:#fff;color:#1f1f1f;font-weight:700;font-size:16px;padding:15px 22px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;max-width:340px;transition:.12s;border:1px solid var(--bd);box-shadow:0 2px 6px rgba(0,0,0,.04)}
 .gbtn:active{transform:scale(.97)}
 .gbtn svg{width:20px;height:20px}
 .login-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center}
