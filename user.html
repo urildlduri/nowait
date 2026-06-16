@@ -29,21 +29,79 @@
 
   <!-- 홈 -->
   <div id="u-home" class="scr on">
-    <div class="page">
-      <div class="h1">지금 우리,<br>갈 수 있는 곳?</div>
-      <div class="muted" style="margin-top:8px">인원과 업종만 고르면 30초 안에 답이 와요.</div>
-      <div class="field"><div class="field-lb">몇 명이세요?</div><div class="chips" id="partyChips"></div></div>
-      <div class="field"><div class="field-lb">어디 가요? <span style="color:var(--tx3);font-weight:500">(여러 개 선택 가능)</span></div><div class="chips" id="catChips"></div></div>
-      <div class="locbox"><div class="pin">📍</div>
-        <div class="txt"><b id="locName">위치 확인 중…</b><small id="locCoord">--</small></div>
-        <button onclick="getLoc()">새로고침</button></div>
-      <div id="locPickWrap" class="hide">
-        <div class="muted" style="font-size:13px;margin-top:10px">위치를 자동으로 못 잡았어요. <b>주소 검색</b>하거나 지도에서 <b>내 위치를 탭</b>해 주세요.</div>
-        <button class="cta ghost" style="margin-top:8px" onclick="uSearchAddr()">🔎 주소로 찾기</button>
-        <div id="locPick" style="width:100%;height:220px;border-radius:var(--rad);margin-top:10px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
+    <div class="page" style="padding:0 0 24px">
+
+      <!-- 상단 카테고리 슬라이드 -->
+      <div style="background:var(--bg2);padding:18px 0;border-bottom:1px solid var(--bd)">
+        <div id="catGrid" style="display:flex;gap:14px;overflow-x:auto;padding:0 20px;scrollbar-width:none"></div>
       </div>
-      <div id="penaltyBanner"></div>
-      <button class="cta" id="callBtn" onclick="startCall()" disabled>지금 호출하기</button>
+
+      <!-- FAST MATCH 카드 -->
+      <div style="padding:20px 20px 8px">
+        <div style="background:var(--y);border-radius:var(--radL);padding:20px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden">
+          <div style="position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)"></div>
+          <div style="position:absolute;right:16px;bottom:-12px;font-size:60px;opacity:.18">⚡</div>
+          <div style="position:relative">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.85;margin-bottom:4px">FAST MATCH ⚡</div>
+            <div style="font-size:19px;font-weight:700;line-height:1.4;margin-bottom:2px">지금 갈 수 있는 곳을<br>1분 안에 찾아드려요</div>
+            <div style="font-size:12px;opacity:.85">호출 한 번이면 주변 매장이 응답해요</div>
+          </div>
+        </div>
+
+        <!-- 호출 폼 -->
+        <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--radL);padding:16px">
+          <div class="field-lb" style="margin-top:0">몇 명이세요?</div>
+          <div class="chips" id="partyChips"></div>
+          <div class="field-lb" style="margin-top:16px">어디 가요? <span style="color:var(--tx3);font-weight:500">(여러 개 가능)</span></div>
+          <div class="chips" id="catChips"></div>
+          <div class="locbox" style="margin-top:16px"><div class="pin">📍</div>
+            <div class="txt"><b id="locName">위치 확인 중…</b><small id="locCoord">--</small></div>
+            <button onclick="getLoc()">새로고침</button></div>
+          <div id="locPickWrap" class="hide">
+            <div class="muted" style="font-size:13px;margin-top:10px">위치를 자동으로 못 잡았어요. <b>주소 검색</b>하거나 지도에서 <b>내 위치를 탭</b>해 주세요.</div>
+            <button class="cta ghost" style="margin-top:8px" onclick="uSearchAddr()">🔎 주소로 찾기</button>
+            <div id="locPick" style="width:100%;height:220px;border-radius:var(--rad);margin-top:10px;background:var(--bg3);border:1px solid var(--bd);overflow:hidden"></div>
+          </div>
+          <div id="penaltyBanner"></div>
+          <button class="cta" id="callBtn" onclick="startCall()" disabled style="margin-top:18px">지금 호출하기 →</button>
+        </div>
+      </div>
+
+      <!-- 🔥 지금 핫한 곳 미리보기 -->
+      <div style="padding:20px 0 8px;background:var(--bg2);margin-top:8px;border-top:1px solid var(--bd);border-bottom:1px solid var(--bd)">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;padding:0 20px;margin-bottom:14px">
+          <div><div style="font-size:16px;font-weight:800">🔥 지금 핫한 곳</div><div style="font-size:11px;color:var(--tx3);margin-top:2px" id="homeHotSub">주변 3km 이내</div></div>
+          <button onclick="uGo('u-hot','n-hot')" style="background:none;font-size:12px;color:var(--y);font-weight:700">전체보기 ›</button>
+        </div>
+        <div id="homeHotList" style="display:flex;gap:12px;overflow-x:auto;padding:0 20px 6px;scrollbar-width:none">
+          <div class="muted" style="font-size:13px;padding:0 0 8px">불러오는 중…</div>
+        </div>
+      </div>
+
+      <!-- 🏆 내 포인트 -->
+      <div style="padding:20px">
+        <div onclick="uGo('u-my','n-my')" style="background:var(--infobg);border:1px solid var(--bd);border-radius:var(--radL);padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer">
+          <div style="font-size:32px">🏆</div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--y)">내 포인트</div>
+            <div style="font-size:20px;font-weight:800;color:var(--y);margin-top:2px" id="homePoints">--</div></div>
+          <div style="font-size:11px;color:var(--y);font-weight:700;padding:6px 10px;border:1px solid var(--y);border-radius:8px;background:var(--bg2)">MY ›</div>
+        </div>
+      </div>
+
+      <!-- 푸터 -->
+      <div style="padding:24px 20px;background:var(--bg3);border-top:1px solid var(--bd);font-size:11px;color:var(--tx3);line-height:1.8">
+        <div style="font-weight:800;color:var(--tx2);margin-bottom:8px">NoWait (노웨이트)</div>
+        <div>대표자 : 유명환</div>
+        <div>사업자등록번호 : 등록 예정</div>
+        <div>주소 : 서울특별시 강남구</div>
+        <div>고객문의 : urildlduri@gmail.com</div>
+        <div style="margin-top:14px;display:flex;gap:14px;flex-wrap:wrap">
+          <a href="terms.html" style="color:var(--tx2);font-weight:700">이용약관</a>
+          <a href="privacy.html" style="color:var(--y);font-weight:800">개인정보처리방침</a>
+        </div>
+        <div style="margin-top:16px;color:var(--tx3);font-size:10px">© 2026 NoWait. All rights reserved.</div>
+      </div>
+
     </div>
   </div>
 
@@ -255,6 +313,7 @@ function init(){
     }
     refreshPenalty();
     loadHotplaces();
+    loadPoints();
     // 진행중인 호출 자동 복원 (위치 로딩 대기)
     setTimeout(()=>restoreActiveCall(), 1500);
   });
@@ -386,7 +445,14 @@ async function loadHotplaces(force){
   }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">핫플을 불러오지 못했어요.</div>'; }
 }
 function renderHot(list){
-  if(!list.length){$('hotList').innerHTML='<div class="muted" style="font-size:13px">3km 이내에 등록된 핫플이 없어요.</div>';$('hotMore').textContent='';return;}
+  // 핫플 탭
+  if(!list.length){
+    $('hotList').innerHTML='<div class="muted" style="font-size:13px">3km 이내에 등록된 핫플이 없어요.</div>';
+    $('hotMore').textContent='';
+    $('homeHotList').innerHTML='<div class="muted" style="font-size:13px;padding-bottom:8px">아직 등록된 핫플이 없어요.</div>';
+    $('homeHotSub').textContent='주변 3km 이내';
+    return;
+  }
   $('hotMore').textContent=`${list.length}곳 · 3km 이내`;
   $('hotList').innerHTML=list.map(h=>{
     const cat=catOf(h.cat);
@@ -401,6 +467,28 @@ function renderHot(list){
         <div class="meta" style="white-space:normal;font-family:inherit;color:var(--tx2);margin-top:4px">${cat.n}${h.hours?' · '+h.hours:''}</div>
         <div style="margin-top:6px;display:flex;gap:8px;align-items:center;font-size:12px">${rating}${dist?`<span class="meta">${dist}</span>`:''}</div>
       </div></div>`;
+  }).join('');
+
+  // 홈 미리보기 — 상위 5개, 큰 가로 카드
+  const colors=['#DBEAFE','#E0E7FF','#FEF3C7','#FCE7F3','#D1FAE5','#FED7AA','#CFFAFE','#F3E8FF','#FFE4E6'];
+  $('homeHotSub').textContent=`주변 3km · ${list.length}곳`;
+  $('homeHotList').innerHTML=list.slice(0,5).map((h,i)=>{
+    const cat=catOf(h.cat);
+    const dist=h._dist!=null?distLabel(h._dist):'';
+    const bg = colors[i%colors.length];
+    const photo = h.photo
+      ? `<img src="${h.photo}" style="width:100%;height:130px;object-fit:cover;border-radius:12px">`
+      : `<div style="width:100%;height:130px;border-radius:12px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:48px">${cat.e}</div>`;
+    const rating=h.ratingAvg?`<span style="color:var(--y);font-weight:700">★ ${(+h.ratingAvg).toFixed(1)}</span>`:'';
+    return `<div onclick="openHotDetail('${h.id}')" style="flex-shrink:0;width:158px;cursor:pointer">
+      <div style="position:relative;margin-bottom:8px">
+        ${photo}
+        <div style="position:absolute;top:8px;left:8px;background:var(--y);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🔥 HOT</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:2px">${h.name||'매장'}</div>
+      <div style="font-size:11px;color:var(--tx3)">${cat.n}${dist?' · '+dist:''}</div>
+      <div style="display:flex;gap:6px;margin-top:4px;font-size:11px">${rating}</div>
+    </div>`;
   }).join('');
 }
 
@@ -753,7 +841,20 @@ async function updateBizRating(bizId){
 function buildChips(){
   $('partyChips').innerHTML=PARTY.map(p=>`<button class="chip" data-p="${p}" onclick="pickParty(${p})">${p}${p===6?'+':''}명</button>`).join('');
   $('catChips').innerHTML=CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
+  // 상단 카테고리 그리드 (가로 스크롤)
+  const colors=['#DBEAFE','#E0E7FF','#FEF3C7','#FCE7F3','#D1FAE5','#FED7AA','#CFFAFE','#F3E8FF','#FFE4E6'];
+  $('catGrid').innerHTML=CATS.map((c,i)=>`<div onclick="quickPickCat('${c.k}')" style="text-align:center;flex-shrink:0;width:62px;cursor:pointer">
+    <div style="width:54px;height:54px;border-radius:50%;background:${colors[i%colors.length]};display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 4px">${c.e}</div>
+    <div style="font-size:11px;font-weight:600;color:var(--tx2)">${c.n}</div></div>`).join('');
 }
+window.quickPickCat=k=>{
+  // 호출 폼 카테고리 칩 활성화 + 스크롤
+  if(!sel.cats.includes(k)) sel.cats.push(k);
+  document.querySelectorAll('#catChips .chip').forEach(b=>b.classList.toggle('on',sel.cats.includes(b.dataset.c)));
+  chkReady();
+  toast(`${catOf(k).n} 선택됨`);
+  document.querySelector('#callBtn')?.scrollIntoView({behavior:'smooth',block:'center'});
+};
 window.pickParty=p=>{sel.party=p;document.querySelectorAll('#partyChips .chip').forEach(b=>b.classList.toggle('on',+b.dataset.p===p));chkReady();};
 window.pickCat=k=>{
   const i=sel.cats.indexOf(k);
@@ -1174,12 +1275,13 @@ async function awardPoints(delta, reason){
 }
 
 async function loadPoints(){
-  if(!NW.uid) { userPoints=0; return; }
-  try{
+  if(!NW.uid) { userPoints=0; }
+  else try{
     const {doc,getDoc}=NW.fb;
     const s=await getDoc(doc(NW.db,'nw_users',NW.uid));
     userPoints = (s.exists() && s.data().points) || 0;
   }catch(e){userPoints=0;}
+  const el=$('homePoints'); if(el) el.textContent = userPoints.toLocaleString()+' P';
 }
 
 async function renderMy(){
