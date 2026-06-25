@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>NOWAIT · 사용자</title>
+<title>OHdiga · 사용자</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="nw.css">
 <style>
 .ring-wrap{display:flex;align-items:center;gap:16px;margin-top:24px;justify-content:center}
@@ -23,7 +23,7 @@
 <div id="cfgWarn" class="hide"></div>
 <div class="mobile">
   <div class="topbar">
-    <div class="lg">NO<span class="w">WAIT</span></div>
+    <div class="lg"><span class="w">Oh</span>diga</div>
     <div id="acct"></div>
   </div>
 
@@ -43,7 +43,7 @@
           <div style="position:absolute;right:16px;bottom:-12px;font-size:60px;opacity:.18">⚡</div>
           <div style="position:relative">
             <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.85;margin-bottom:4px">FAST MATCH ⚡</div>
-            <div style="font-size:19px;font-weight:700;line-height:1.4;margin-bottom:2px">지금 갈 수 있는 곳을<br>1분 안에 찾아드려요</div>
+            <div style="font-size:19px;font-weight:700;line-height:1.4;margin-bottom:2px">지금 갈 수 있는 곳을<br>바로 찾아드려요</div>
             <div style="font-size:12px;opacity:.85">호출 한 번이면 주변 매장이 응답해요</div>
           </div>
         </div>
@@ -90,8 +90,8 @@
 
       <!-- 푸터 -->
       <div style="padding:24px 20px;background:var(--bg3);border-top:1px solid var(--bd);font-size:11px;color:var(--tx3);line-height:1.8">
-        <div style="font-weight:800;color:var(--tx2);margin-bottom:8px">NoWait (노웨이트)</div>
-        <div>대표자 : 유성현</div>
+        <div style="font-weight:800;color:var(--tx2);margin-bottom:8px">OHdiga (오디가)</div>
+        <div>대표자 : 유명환</div>
         <div>사업자등록번호 : 등록 예정</div>
         <div>주소 : 서울특별시 강남구</div>
         <div>고객문의 : urildlduri@gmail.com</div>
@@ -99,7 +99,7 @@
           <a href="terms.html" style="color:var(--tx2);font-weight:700">이용약관</a>
           <a href="privacy.html" style="color:var(--y);font-weight:800">개인정보처리방침</a>
         </div>
-        <div style="margin-top:16px;color:var(--tx3);font-size:10px">© 2026 NoWait. All rights reserved.</div>
+        <div style="margin-top:16px;color:var(--tx3);font-size:10px">© 2026 OHdiga. All rights reserved.</div>
       </div>
 
     </div>
@@ -1402,7 +1402,7 @@ async function renderPartner(){
       <div class="muted" style="font-size:13px;margin-top:8px">지도에서 <b>매장 위치를 탭</b>하세요.</div>
       <div id="pPick" style="width:100%;height:200px;border-radius:var(--rad);margin-top:8px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div></div>
     <button class="cta" id="pBtn" onclick="submitPartner()" disabled>매장 파트너 신청하기</button>
-    <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 되고, 관리자(NOWAIT 운영팀) 승인 후 매장 콘솔이 열려요.</div>`;
+    <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 되고, 관리자(OHdiga 운영팀) 승인 후 매장 콘솔이 열려요.</div>`;
   $('pCat').innerHTML=NW.CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pPickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
   $('pRad').innerHTML=NW.RADII.map(r=>`<button class="chip ${r===1000?'on':''}" data-r="${r}" onclick="pPickRad(${r})">${distLabel(r)}</button>`).join('');
   $('pName').addEventListener('input',pChk);

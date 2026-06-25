@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NOWAIT · 매장 콘솔</title>
+<title>OHdiga · 매장 콘솔</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="nw.css">
 </head>
 <body>
@@ -33,7 +33,7 @@
 <!-- 운영 콘솔 -->
 <div id="m-console" class="scr">
   <div class="tab-top">
-    <div class="lg">NO<span class="w">WAIT</span> <span style="font-size:13px;color:var(--tx3);font-weight:700">매장 콘솔</span></div>
+    <div class="lg"><span class="w">Oh</span>diga <span style="font-size:13px;color:var(--tx3);font-weight:700">매장 콘솔</span></div>
     <div style="display:flex;align-items:center;gap:16px">
       <div class="biz"><div><div class="nm" id="cBizName">·</div><div class="ct" id="cBizCat">·</div></div></div>
       <button class="adm-btn" style="padding:8px 12px;font-size:12px" onclick="openStats()">📊 통계</button>
@@ -585,7 +585,7 @@ function stopTitleBlink(){ if(titleBlinkTimer){clearInterval(titleBlinkTimer);ti
 function showNotification(count){
   if(!('Notification' in window) || Notification.permission!=='granted') return;
   try{
-    const n=new Notification('NOWAIT — 새 호출',{
+    const n=new Notification('OHdiga — 새 호출',{
       body:`${count}건의 새 호출이 도착했어요`,
       tag:'nw-call', renotify:true, requireInteraction:false
     });

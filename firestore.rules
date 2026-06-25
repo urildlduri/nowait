@@ -1,8 +1,69 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email in ['urildlduri@gmail.com'];
+    }
+    function signedIn() { return request.auth != null; }
+
+    match /nw_users/{uid} {
+      allow read: if signedIn();
+      allow create, update: if request.auth.uid == uid;
+      allow delete: if isAdmin();
+      match /history/{doc} {
+        allow read, write: if request.auth.uid == uid;
+      }
+    }
+
+    match /nw_biz/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.approved == false;
+      // 수정: 관리자 / 오너 / 멤버 / 또는 평점 필드만 갱신(리뷰 작성·삭제 시)
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.ownerId == request.auth.uid
+            && request.resource.data.approved == resource.data.approved)
+        || (signedIn() && resource.data.memberEmails is list
+            && request.auth.token.email in resource.data.memberEmails
+            && request.resource.data.ownerId == resource.data.ownerId
+            && request.resource.data.approved == resource.data.approved
+            && request.resource.data.memberEmails == resource.data.memberEmails)
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['ratingAvg','ratingCount']));
+      allow delete: if isAdmin();
+    }
+
+    // 리뷰 (1매장 1사용자 — 문서 id가 bizId_uid)
+    match /nw_reviews/{rid} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    match /nw_calls/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.callerId == request.auth.uid;
+      // 호출 수정 허용:
+      // - 호출자 본인 (취소·갈게요·도착·노쇼 등 모든 상태 변경)
+      // - 로그인된 누구나 status를 '매칭/수락/진행/완료/노쇼/취소/만료' 중 하나로 설정 가능
+      //   (매장이 손님 매칭 응답 + 도착확인 + 노쇼 처리 등)
+      allow update: if signedIn() && (
+        resource.data.callerId == request.auth.uid
+        || request.resource.data.status in ['matched','accepted','going','done','noshow','cancelled','expired']
+      );
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.callerId == request.auth.uid);
+      match /responses/{bizId} {
+        allow read: if signedIn();
+        allow write: if signedIn();
+      }
     }
   }
 }

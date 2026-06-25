@@ -1,5 +1,5 @@
 /* ============================================================
-   NOWAIT 공통 코어  ·  nw-core.js
+   OHDIGA 공통 코어  ·  nw-core.js
    ① Firebase 설정은 여기 한 곳에서만 관리합니다.
    ============================================================ */
 const FIREBASE_CONFIG = {
@@ -165,7 +165,7 @@ NW.fbReady = (async()=>{
     }
     NW.fbLoaded = true;
   }catch(e){
-    console.error('[NOWAIT] Firebase 로드 실패:',e);
+    console.error('[OHDIGA] Firebase 로드 실패:',e);
     const w=NW.$('cfgWarn');
     if(w){w.classList.remove('hide');
       w.textContent='⚠️ Firebase 로드 실패 — file://이 아닌 http(s)로 열어야 합니다. 콘솔(F12) 로그 참고.';}
