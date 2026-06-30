@@ -19,9 +19,12 @@ service cloud.firestore {
 
     match /nw_biz/{id} {
       allow read: if signedIn();
-      allow create: if signedIn()
-        && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.approved == false;
+      // 일반 사용자: 본인 명의 + 미승인 상태로만 생성 가능 (파트너 신청)
+      // 관리자: 임의 ownerId + 승인 상태로 즉시 생성 가능 (현장 영업용 사전 생성)
+      allow create: if isAdmin()
+        || (signedIn()
+            && request.resource.data.ownerId == request.auth.uid
+            && request.resource.data.approved == false);
       // 수정: 관리자 / 오너 / 멤버 / 또는 평점 필드만 갱신(리뷰 작성·삭제 시)
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerId == request.auth.uid

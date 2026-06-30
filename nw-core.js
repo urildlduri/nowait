@@ -154,6 +154,9 @@ NW.fbReady = (async()=>{
       getAuth:Au.getAuth, signInAnonymously:Au.signInAnonymously, onAuthStateChanged:Au.onAuthStateChanged,
       GoogleAuthProvider:Au.GoogleAuthProvider, signInWithPopup:Au.signInWithPopup, signOut:Au.signOut,
       signInWithRedirect:Au.signInWithRedirect, getRedirectResult:Au.getRedirectResult,
+      createUserWithEmailAndPassword:Au.createUserWithEmailAndPassword,
+      signInWithEmailAndPassword:Au.signInWithEmailAndPassword,
+      updateProfile:Au.updateProfile,
       collection:F.collection, collectionGroup:F.collectionGroup, doc:F.doc, addDoc:F.addDoc, setDoc:F.setDoc, updateDoc:F.updateDoc,
       getDoc:F.getDoc, getDocs:F.getDocs, query:F.query, where:F.where, onSnapshot:F.onSnapshot,
       serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp, increment:F.increment
@@ -214,6 +217,78 @@ NW.googleLogin = async function(){
 NW.logout = async function(){
   await NW.fbReady; if(NW.fb.signOut) await NW.fb.signOut(NW.auth);
   location.href='index.html';
+};
+
+/* ── 매장 전용 아이디 로그인 (사전 발급 계정) ──
+   관리자가 미리 매장 정보 + 계정을 만들어두고 아이디/비번만 사장님께 전달하는 방식.
+   내부적으로 {매장아이디}@ohdiga.local 가짜 이메일로 변환해서 Firebase Auth 사용. ── */
+NW.merchantIdToFakeEmail = function(merchantId){
+  return merchantId.toLowerCase().trim() + '@ohdiga.local';
+};
+
+NW.merchantLogin = async function(merchantId, password){
+  await NW.fbReady;
+  if(!NW.fbLoaded) throw new Error('firebase not loaded');
+  const {signInWithEmailAndPassword} = NW.fb;
+  const fakeEmail = NW.merchantIdToFakeEmail(merchantId);
+  const res = await signInWithEmailAndPassword(NW.auth, fakeEmail, password);
+  NW.uid = res.user.uid; NW.user = res.user;
+  await NW.ensureProfile(res.user);
+  return res.user;
+};
+
+/* ── 관리자용: 매장 계정 사전 생성 (보조 앱 인스턴스 사용) ──
+   매장명/카테고리/주소/좌표를 입력하면:
+   1) 랜덤 아이디 + 비번 생성
+   2) 별도의 보조 Firebase App에서 계정 생성 (관리자 세션 보호)
+   3) biz 문서를 approved:true 상태로 즉시 생성 (온보딩 절차 생략)
+   반환값: {merchantId, password, bizId} — 이 정보를 사장님께 전달하면 끝.  ── */
+NW.adminCreateMerchant = async function({name, cat, addr, lat, lng}){
+  await NW.fbReady;
+  if(!NW.fbLoaded) throw new Error('firebase not loaded');
+  const A  = await import(FB_BASE+"firebase-app.js");
+  const Au = await import(FB_BASE+"firebase-auth.js");
+  const {doc, setDoc, serverTimestamp} = NW.fb;
+
+  // 1) 아이디/비번 생성
+  const rand = Math.floor(1000+Math.random()*9000);
+  const merchantId = `${cat||'biz'}-${rand}`;
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let password = '';
+  for(let i=0;i<8;i++) password += chars[Math.floor(Math.random()*chars.length)];
+  const fakeEmail = NW.merchantIdToFakeEmail(merchantId);
+
+  // 2) 보조 앱 인스턴스에서 계정 생성 (관리자 세션 영향 없음)
+  const tempAppName = 'merchant-creator-'+Date.now();
+  const tempApp = A.initializeApp(FIREBASE_CONFIG, tempAppName);
+  const tempAuth = Au.getAuth(tempApp);
+  let newUid;
+  try{
+    const res = await Au.createUserWithEmailAndPassword(tempAuth, fakeEmail, password);
+    newUid = res.user.uid;
+    if(Au.updateProfile) await Au.updateProfile(res.user, {displayName: name});
+    await Au.signOut(tempAuth); // 보조 앱 세션 정리
+  }finally{
+    // 보조 앱 인스턴스 정리 (메모리 누수 방지)
+    if(A.deleteApp) await A.deleteApp(tempApp).catch(()=>{});
+  }
+
+  // 3) biz 문서는 메인 NW.db로 생성 (관리자 권한으로 — 본인 세션 유지된 상태)
+  await setDoc(doc(NW.db,'nw_biz',newUid), {
+    ownerId: newUid,
+    name: name||'매장',
+    cat: cat||'',
+    addr: addr||'',
+    lat: lat||null,
+    lng: lng||null,
+    approved: true,
+    status: 'open',
+    isHot: false,
+    createdAt: serverTimestamp(),
+    merchantId,
+  });
+
+  return { merchantId, password, bizId: newUid };
 };
 
 /* 공통 계정 메뉴 위젯 — 컨테이너 id를 받아 프로필칩+드롭다운 렌더 */
