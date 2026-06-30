@@ -150,6 +150,7 @@ NW.fbReady = (async()=>{
     const A  = await import(FB_BASE+"firebase-app.js");
     const Au = await import(FB_BASE+"firebase-auth.js");
     const F  = await import(FB_BASE+"firebase-firestore.js");
+    const S  = await import(FB_BASE+"firebase-storage.js");
     Object.assign(NW.fb, {
       getAuth:Au.getAuth, signInAnonymously:Au.signInAnonymously, onAuthStateChanged:Au.onAuthStateChanged,
       GoogleAuthProvider:Au.GoogleAuthProvider, signInWithPopup:Au.signInWithPopup, signOut:Au.signOut,
@@ -159,12 +160,14 @@ NW.fbReady = (async()=>{
       updateProfile:Au.updateProfile,
       collection:F.collection, collectionGroup:F.collectionGroup, doc:F.doc, addDoc:F.addDoc, setDoc:F.setDoc, updateDoc:F.updateDoc,
       getDoc:F.getDoc, getDocs:F.getDocs, query:F.query, where:F.where, onSnapshot:F.onSnapshot,
-      serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp, increment:F.increment
+      serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp, increment:F.increment,
+      getStorage:S.getStorage, storageRef:S.ref, uploadBytes:S.uploadBytes, getDownloadURL:S.getDownloadURL, deleteObject:S.deleteObject
     });
     if(NW.cfgOk){
       NW.app  = A.initializeApp(FIREBASE_CONFIG);
       NW.auth = Au.getAuth(NW.app);
       NW.db   = F.getFirestore(NW.app);
+      NW.storage = S.getStorage(NW.app);
     }
     NW.fbLoaded = true;
   }catch(e){
@@ -366,6 +369,25 @@ NW.onAuth = function(cb){
 };
 
 /* 프로필 문서 생성/조회 (nw_users/{uid}) */
+/* ── 매장 사진 업로드 (Firebase Storage) ──
+   경로: biz_photos/{bizId}/{timestamp}_{filename}
+   반환: 다운로드 URL ── */
+NW.uploadBizPhoto = async function(file, bizId){
+  await NW.fbReady;
+  if(!NW.fbLoaded || !NW.storage) throw new Error('storage not loaded');
+  if(!file) throw new Error('파일이 없습니다');
+  if(!file.type.startsWith('image/')) throw new Error('이미지 파일만 업로드 가능합니다');
+  if(file.size > 5*1024*1024) throw new Error('파일 크기는 5MB 이하여야 합니다');
+
+  const {storageRef, uploadBytes, getDownloadURL} = NW.fb;
+  const safeName = file.name.replace(/[^a-zA-Z0-9.]/g,'_');
+  const path = `biz_photos/${bizId}/${Date.now()}_${safeName}`;
+  const ref = storageRef(NW.storage, path);
+  await uploadBytes(ref, file);
+  const url = await getDownloadURL(ref);
+  return url;
+};
+
 NW.ensureProfile = async function(u, extra){
   const {doc,getDoc,setDoc,serverTimestamp}=NW.fb;
   const ref=doc(NW.db,'nw_users',u.uid);
