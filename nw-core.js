@@ -219,6 +219,41 @@ NW.logout = async function(){
   location.href='index.html';
 };
 
+/* ── 일반 사용자 아이디 회원가입/로그인 ──
+   구글 로그인과 별개로, 아이디+비번으로도 가입 가능.
+   {아이디}@ohdiga-user.local 가짜 이메일 사용 (매장용 .local 과 네임스페이스 분리). ── */
+NW.userIdToFakeEmail = function(userId){
+  return userId.toLowerCase().trim() + '@ohdiga-user.local';
+};
+
+NW.userIdSignup = async function({userId, password, name}){
+  await NW.fbReady;
+  if(!NW.fbLoaded) throw new Error('firebase not loaded');
+  if(!/^[a-zA-Z0-9_]{4,16}$/.test(userId)) throw new Error('아이디는 영문/숫자/_ 4~16자여야 합니다');
+  const {collection, query, where, getDocs, createUserWithEmailAndPassword, updateProfile} = NW.fb;
+  // 아이디 중복 체크
+  const dup = await getDocs(query(collection(NW.db,'nw_users'), where('userId','==',userId.toLowerCase().trim())));
+  if(!dup.empty) throw new Error('이미 사용 중인 아이디입니다');
+
+  const fakeEmail = NW.userIdToFakeEmail(userId);
+  const res = await createUserWithEmailAndPassword(NW.auth, fakeEmail, password);
+  if(updateProfile && name) await updateProfile(res.user, {displayName: name});
+  NW.uid = res.user.uid; NW.user = res.user;
+  await NW.ensureProfile(res.user, {userId: userId.toLowerCase().trim(), name});
+  return res.user;
+};
+
+NW.userIdLogin = async function(userId, password){
+  await NW.fbReady;
+  if(!NW.fbLoaded) throw new Error('firebase not loaded');
+  const {signInWithEmailAndPassword} = NW.fb;
+  const fakeEmail = NW.userIdToFakeEmail(userId);
+  const res = await signInWithEmailAndPassword(NW.auth, fakeEmail, password);
+  NW.uid = res.user.uid; NW.user = res.user;
+  await NW.ensureProfile(res.user);
+  return res.user;
+};
+
 /* ── 매장 전용 아이디 로그인 (사전 발급 계정) ──
    관리자가 미리 매장 정보 + 계정을 만들어두고 아이디/비번만 사장님께 전달하는 방식.
    내부적으로 {매장아이디}@ohdiga.local 가짜 이메일로 변환해서 Firebase Auth 사용. ── */
@@ -331,14 +366,19 @@ NW.onAuth = function(cb){
 };
 
 /* 프로필 문서 생성/조회 (nw_users/{uid}) */
-NW.ensureProfile = async function(u){
+NW.ensureProfile = async function(u, extra){
   const {doc,getDoc,setDoc,serverTimestamp}=NW.fb;
   const ref=doc(NW.db,'nw_users',u.uid);
   const s=await getDoc(ref);
   if(!s.exists()){
-    await setDoc(ref,{name:u.displayName||'',email:u.email||'',photo:u.photoURL||'',
-      role:'user', createdAt:serverTimestamp()});
-    NW.profile={name:u.displayName||'',email:u.email||'',role:'user'};
+    const profile = {
+      name: extra?.name || u.displayName || '',
+      email: u.email||'', photo: u.photoURL||'',
+      userId: extra?.userId || null,
+      role:'user', createdAt:serverTimestamp()
+    };
+    await setDoc(ref, profile);
+    NW.profile = profile;
   }else NW.profile=s.data();
   return NW.profile;
 };
