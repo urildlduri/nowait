@@ -174,7 +174,17 @@ window.doUserIdLogin=async()=>{
   const pw = $('uLoginPw').value;
   if(!id || !pw){ NW.toast('아이디와 비밀번호를 입력해주세요'); return; }
   try{
-    const u = await NW.userIdLogin(id, pw);
+    let u;
+    // 이메일 형식이면 이메일 로그인 (관리자 계정 등)
+    if(id.includes('@')){
+      const {signInWithEmailAndPassword} = NW.fb;
+      await NW.fbReady;
+      const res = await signInWithEmailAndPassword(NW.auth, id, pw);
+      u = res.user; NW.uid = u.uid; NW.user = u;
+      await NW.ensureProfile(u);
+    }else{
+      u = await NW.userIdLogin(id, pw);
+    }
     await afterLogin(u);
   }catch(e){
     NW.toast('로그인 실패: '+(userAuthErrMsg(e.code)||e.message));
