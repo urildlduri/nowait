@@ -291,7 +291,8 @@ NW.adminCreateMerchant = async function({name, cat, addr, lat, lng}){
   // 1) 아이디/비번 생성
   const rand = Math.floor(1000+Math.random()*9000);
   const merchantId = `${cat||'biz'}-${rand}`;
-  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  // 읽기 쉬운 영문소문자+숫자 8자리 (헷갈리는 l,o,0,1 제외)
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
   let password = '';
   for(let i=0;i<8;i++) password += chars[Math.floor(Math.random()*chars.length)];
   const fakeEmail = NW.merchantIdToFakeEmail(merchantId);
