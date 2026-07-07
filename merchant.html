@@ -104,13 +104,15 @@
       <input type="hidden" id="ePhoto">
       <input type="hidden" id="ePhotos">
     </div>
+    <div class="field"><div class="field-lb">소개글 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
+      <textarea class="inp" id="eDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="resize:vertical"></textarea></div>
     <div class="field"><div class="field-lb">홈페이지 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
       <input class="inp" id="eWebsite" placeholder="https://..."></div>
-    <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
-      <textarea class="inp" id="eMenu" rows="3"></textarea></div>
     <div class="field"><div class="field-lb">영업시간 / 전화</div>
       <input class="inp" id="eHours" placeholder="매일 17:00 – 02:00" style="margin-bottom:8px">
       <input class="inp" id="ePhone" placeholder="02-000-0000"></div>
+    <div class="field"><div class="field-lb">최소 인원</div>
+      <div class="chips" id="eMinPartyChips"></div></div>
     <div class="field"><div class="field-lb">편의</div>
       <div class="chips">
         <button class="chip" id="eParking" onclick="this.classList.toggle('on')">🅿 주차</button>
@@ -299,9 +301,13 @@ window.openEdit=()=>{
   setMerchantPhotos(existingPhotos);
   renderMerchantGallery(existingPhotos);
   $('eWebsite').value=myBiz.website||'';
-  $('eMenu').value=(myBiz.menu||[]).map(m=>`${m.name},${m.price||0}`).join('\n');
+  $('eDesc').value=myBiz.desc||'';
   $('eHours').value=myBiz.hours||'';
   $('ePhone').value=myBiz.phone||'';
+  // 최소인원 칩
+  const minP = myBiz.minParty||1;
+  $('eMinPartyChips').innerHTML=[1,2,3,4,5].map(n=>`<button class="chip ${n===minP?'on':''}" data-m="${n}" onclick="ePickMin(${n})">${n}명+</button>`).join('');
+  eSel.minParty=minP;
   $('eParking').classList.toggle('on',!!myBiz.parking);
   $('eReserv').classList.toggle('on',!!myBiz.reservation);
   $('eCat').innerHTML=CATS.map(c=>`<button class="chip ${c.k===eSel.cat?'on':''}" data-c="${c.k}" onclick="ePickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
@@ -365,7 +371,7 @@ window.handlePhotoSelect=async(event)=>{
 };
 window.ePickCat=k=>{eSel.cat=k;document.querySelectorAll('#eCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));};
 window.ePickRad=r=>{eSel.rad=r;document.querySelectorAll('#eRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
-window.ePickMin=n=>{eSel.minParty=n;document.querySelectorAll('#eMinParty .chip').forEach(b=>b.classList.toggle('on',+b.dataset.m===n));};
+window.ePickMin=n=>{eSel.minParty=n;document.querySelectorAll('#eMinPartyChips .chip').forEach(b=>b.classList.toggle('on',+b.dataset.m===n));};
 window.eUseGps=()=>{
   if(!navigator.geolocation){toast('GPS 불가');return;}
   toast('현재 위치 확인 중…');
@@ -430,10 +436,13 @@ window.saveEdit=async()=>{
   const lat=parseFloat($('eLat').value), lng=parseFloat($('eLng').value);
   if(!$('eName').value.trim()){toast('매장 이름을 입력하세요');return;}
   if(isNaN(lat)||isNaN(lng)){toast('위치 좌표가 필요해요');return;}
-  const menu=$('eMenu').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};});
+  
   const photos = getMerchantPhotos();
   const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,minParty:eSel.minParty||1,lat,lng,
-    photo:photos[0]||'', photos, website:$('eWebsite').value.trim(),menu,hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
+    photo:photos[0]||'', photos,
+    desc:$('eDesc')?.value.trim()||'',
+    website:$('eWebsite').value.trim(),
+    hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
     parking:$('eParking').classList.contains('on'),reservation:$('eReserv').classList.contains('on')};
   const {doc,updateDoc}=NW.fb;
   await updateDoc(doc(NW.db,'nw_biz',myBizId),patch).catch(e=>{toast('저장 실패: '+e.message);throw e;});

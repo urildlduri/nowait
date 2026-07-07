@@ -1492,7 +1492,9 @@ function renderPenaltyBannerMy(){const el=$('myStatus');
     el.innerHTML=`<div class="penalty"><div class="pi">⛔</div><div><b>노쇼 패널티 적용 중</b><div class="pt">약 ${left}분 후 해제</div></div></div>`;}
   else el.innerHTML=`<div class="statbox"><b style="color:var(--ok)">✓ 정상 이용 가능</b><div class="muted" style="margin-top:6px">패널티 없음</div></div>`;}
 /* ── 매장 파트너 ── */
-let pSel={cat:null,rad:1000}, pLoc=null;
+let pSel={cat:null,rad:1000,minParty:1}, pLoc=null;
+let pPhotoList=[], pMenuPhotoList=[];
+
 async function renderPartner(){
   const body=$('partnerBody');
   const biz=await NW.myBusiness();
@@ -1509,32 +1511,118 @@ async function renderPartner(){
       <div class="demo-hint">관리자가 승인하면 다음 로그인 때 매장 콘솔로 바로 연결돼요.</div>`;
     return;
   }
+  pPhotoList=[]; pMenuPhotoList=[];
   body.innerHTML=`
     <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="pName" placeholder="예) 강남 라운지펍"></div>
     <div class="field"><div class="field-lb">업종</div><div class="chips" id="pCat"></div></div>
+    <div class="field"><div class="field-lb">주소</div>
+      <div style="display:flex;gap:8px">
+        <input class="inp" id="pAddrInp" placeholder="주소 입력" style="flex:1;margin:0">
+        <button onclick="pSearchAddr()" style="background:var(--y);color:#000;padding:0 14px;border-radius:10px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0">📍 찾기</button>
+      </div>
+      <div id="pAddr" class="muted" style="font-size:12px;margin-top:6px"></div>
+    </div>
+    <div class="field"><div class="field-lb">전화번호</div><input class="inp" id="pPhone" placeholder="02-000-0000"></div>
+    <div class="field"><div class="field-lb">영업시간</div><input class="inp" id="pHours" placeholder="매일 17:00 – 02:00"></div>
+    <div class="field"><div class="field-lb">홈페이지 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div><input class="inp" id="pWebsite" placeholder="https://..."></div>
+    <div class="field"><div class="field-lb">소개글 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
+      <textarea class="inp" id="pDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="resize:vertical"></textarea></div>
     <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="pRad"></div></div>
-    <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
-      <textarea class="inp" id="pMenu" rows="3" placeholder="생맥주 500cc,5000&#10;모둠 안주,23000"></textarea></div>
-    <div class="field"><div class="field-lb">영업시간 / 전화 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
-      <input class="inp" id="pHours" placeholder="매일 17:00 – 02:00" style="margin-bottom:8px">
-      <input class="inp" id="pPhone" placeholder="02-000-0000"></div>
+    <div class="field"><div class="field-lb">최소 인원</div><div class="chips" id="pMinParty"></div></div>
+    <div class="field">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="field-lb" style="margin:0">매장 사진 <span id="pPhotoCntLb">0</span>/10장</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="document.getElementById('pPhotoFile').click()" style="padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--bg2);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일</button>
+          <button onclick="pPhotoByUrl()" style="padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--bg2);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL</button>
+        </div>
+      </div>
+      <input type="file" id="pPhotoFile" accept="image/*" class="hide" onchange="handlePPhotoUpload(event)">
+      <div id="pPhotoGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+    </div>
+    <div class="field">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="field-lb" style="margin:0">메뉴판 사진 <span id="pMenuCntLb">0</span>/5장</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="document.getElementById('pMenuFile').click()" style="padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--bg2);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일</button>
+          <button onclick="pMenuByUrl()" style="padding:6px 10px;border-radius:8px;font-size:11px;font-weight:700;background:var(--bg2);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL</button>
+        </div>
+      </div>
+      <input type="file" id="pMenuFile" accept="image/*" class="hide" onchange="handlePMenuUpload(event)">
+      <div id="pMenuGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+    </div>
     <div class="locbox"><div class="pin">📍</div>
       <div class="txt"><b id="pLocName">위치 확인 중…</b><small id="pLocCoord">--</small></div>
       <button onclick="pGetLoc()">새로고침</button></div>
-    <button class="cta ghost" style="margin-top:10px" onclick="pSearchAddr()">🔎 주소로 위치 찾기</button>
-    <div id="pAddr" class="muted" style="font-size:12px;margin-top:6px"></div>
     <div id="pPickWrap" class="hide">
       <div class="muted" style="font-size:13px;margin-top:8px">지도에서 <b>매장 위치를 탭</b>하세요.</div>
       <div id="pPick" style="width:100%;height:200px;border-radius:var(--rad);margin-top:8px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div></div>
-    <button class="cta" id="pBtn" onclick="submitPartner()" disabled>매장 파트너 신청하기</button>
+    <button class="cta" id="pBtn" onclick="submitPartner()" disabled style="margin-top:18px">매장 파트너 신청하기</button>
     <div class="demo-hint">신청하면 <b>승인 대기</b> 상태가 되고, 관리자(OHdiga 운영팀) 승인 후 매장 콘솔이 열려요.</div>`;
+
   $('pCat').innerHTML=NW.CATS.map(c=>`<button class="chip" data-c="${c.k}" onclick="pPickCat('${c.k}')">${c.e} ${c.n}</button>`).join('');
   $('pRad').innerHTML=NW.RADII.map(r=>`<button class="chip ${r===1000?'on':''}" data-r="${r}" onclick="pPickRad(${r})">${distLabel(r)}</button>`).join('');
+  $('pMinParty').innerHTML=[1,2,3,4,5].map(n=>`<button class="chip ${n===1?'on':''}" data-m="${n}" onclick="pPickMin(${n})">${n}명+</button>`).join('');
   $('pName').addEventListener('input',pChk);
+  renderPGallery(); renderPMenuGallery();
   pGetLoc();
 }
+
 window.pPickCat=k=>{pSel.cat=k;document.querySelectorAll('#pCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));pChk();};
 window.pPickRad=r=>{pSel.rad=r;document.querySelectorAll('#pRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
+window.pPickMin=n=>{pSel.minParty=n;document.querySelectorAll('#pMinParty .chip').forEach(b=>b.classList.toggle('on',+b.dataset.m===n));};
+
+// 사진 갤러리
+function renderPGallery(){
+  const el=$('pPhotoGallery'); if(!el) return;
+  $('pPhotoCntLb').textContent=pPhotoList.length;
+  if(!pPhotoList.length){ el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">사진 추가 (최대 10장)</div>`; return; }
+  el.innerHTML=pPhotoList.map((u,i)=>`<div style="position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1"><img src="${u}" style="width:100%;height:100%;object-fit:cover">${i===0?'<div style="position:absolute;top:4px;left:4px;background:var(--y);color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">대표</div>':''}<button onclick="removePPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer">✕</button></div>`).join('');
+}
+function renderPMenuGallery(){
+  const el=$('pMenuGallery'); if(!el) return;
+  $('pMenuCntLb').textContent=pMenuPhotoList.length;
+  if(!pMenuPhotoList.length){ el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">메뉴판 사진 추가 (최대 5장)</div>`; return; }
+  el.innerHTML=pMenuPhotoList.map((u,i)=>`<div style="position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1"><img src="${u}" style="width:100%;height:100%;object-fit:cover"><button onclick="removePMenu(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer">✕</button></div>`).join('');
+}
+window.removePPhoto=i=>{pPhotoList.splice(i,1);renderPGallery();};
+window.removePMenu=i=>{pMenuPhotoList.splice(i,1);renderPMenuGallery();};
+window.pPhotoByUrl=()=>{
+  if(pPhotoList.length>=10){toast('최대 10장');return;}
+  const u=prompt('사진 URL:'); if(!u) return;
+  pPhotoList.push(u.trim()); renderPGallery();
+};
+window.pMenuByUrl=()=>{
+  if(pMenuPhotoList.length>=5){toast('최대 5장');return;}
+  const u=prompt('메뉴판 사진 URL:'); if(!u) return;
+  pMenuPhotoList.push(u.trim()); renderPMenuGallery();
+};
+window.handlePPhotoUpload=async(event)=>{
+  const file=event.target.files[0]; if(!file) return;
+  if(pPhotoList.length>=10){toast('최대 10장');return;}
+  toast('업로드 중…');
+  try{
+    // 임시 bizId로 업로드 (나중에 실제 bizId로 이동 불가 — URL만 저장)
+    const url=await NW.uploadBizPhoto(file, NW.uid+'_pending');
+    pPhotoList.push(url); renderPGallery(); toast('✅ 업로드 완료');
+  }catch(e){toast('실패: '+e.message);}
+  event.target.value='';
+};
+window.handlePMenuUpload=async(event)=>{
+  const file=event.target.files[0]; if(!file) return;
+  if(pMenuPhotoList.length>=5){toast('최대 5장');return;}
+  toast('업로드 중…');
+  try{
+    const {storageRef,uploadBytes,getDownloadURL}=NW.fb;
+    const path=`menu_photos/${NW.uid}_pending/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+    const ref=storageRef(NW.storage,path);
+    await uploadBytes(ref,file);
+    const url=await getDownloadURL(ref);
+    pMenuPhotoList.push(url); renderPMenuGallery(); toast('✅ 업로드 완료');
+  }catch(e){toast('실패: '+e.message);}
+  event.target.value='';
+};
+
 window.pGetLoc=async()=>{$('pLocName').textContent='위치 확인 중…';$('pLocCoord').textContent='--';
   try{ const l=await NW.getGPS(); $('pPickWrap').classList.add('hide'); pApplyLoc(l); }
   catch(e){ $('pLocName').textContent='위치를 잡지 못했어요'; $('pLocCoord').textContent='지도에서 선택'; pShowPicker(); }
@@ -1547,7 +1635,9 @@ async function pShowPicker(){
   pPicker=await NW.locationPicker('pPick', pLoc||myLoc||NW.FALLBACK, (lat,lng)=>pApplyLoc({lat,lng,name:'지도에서 선택한 위치'}));
 }
 window.pSearchAddr=()=>{
+  const inp=$('pAddrInp');
   NW.searchAddress(r=>{
+    if(inp) inp.value=r.address;
     $('pAddr').textContent='📍 '+r.address;
     if(r.lat&&r.lng) pApplyLoc({lat:r.lat,lng:r.lng,name:r.address});
     else pShowPicker();
@@ -1556,12 +1646,17 @@ window.pSearchAddr=()=>{
 function pChk(){const b=$('pBtn');if(b)b.disabled=!($('pName').value.trim()&&pSel.cat&&pLoc);}
 window.submitPartner=async()=>{
   const {collection,addDoc,serverTimestamp}=NW.fb;
-  const menu=$('pMenu').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};});
   await addDoc(collection(NW.db,'nw_biz'),{
-    name:$('pName').value.trim(),cat:pSel.cat,radius:pSel.rad,lat:pLoc.lat,lng:pLoc.lng,status:'open',
-    approved:false,ownerId:NW.uid,ownerName:NW.user?.displayName||'',ownerEmail:NW.user?.email||'',
-    menu,hours:$('pHours').value.trim(),phone:$('pPhone').value.trim(),parking:false,reservation:true,
-    photo:'',createdAt:serverTimestamp()});
+    name:$('pName').value.trim(), cat:pSel.cat, radius:pSel.rad, minParty:pSel.minParty||1,
+    lat:pLoc.lat, lng:pLoc.lng, addr:$('pAddrInp')?.value.trim()||'',
+    status:'open', approved:false,
+    ownerId:NW.uid, ownerName:NW.user?.displayName||'', ownerEmail:NW.user?.email||'',
+    hours:$('pHours').value.trim(), phone:$('pPhone').value.trim(),
+    website:$('pWebsite')?.value.trim()||'', desc:$('pDesc')?.value.trim()||'',
+    photos:pPhotoList, photo:pPhotoList[0]||'',
+    menuPhotos:pMenuPhotoList,
+    parking:false, reservation:true, createdAt:serverTimestamp()
+  });
   toast('매장 신청 완료! 관리자 승인을 기다려 주세요.');
   renderPartner();
 };
