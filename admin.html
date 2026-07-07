@@ -685,9 +685,16 @@ window.openBizDetail=async(bizId)=>{
         </div>
         ${(b.menu&&b.menu.length)?`
           <div style="margin-top:14px">
-            <div class="muted" style="font-size:11px;margin-bottom:6px">메뉴</div>
-            <div style="display:flex;flex-direction:column;gap:4px">
-              ${b.menu.map(m=>`<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--bg3);border-radius:8px;font-size:13px"><span>${m.name}</span><b>${m.price?m.price.toLocaleString()+'원':'-'}</b></div>`).join('')}
+            <div class="muted" style="font-size:11px;margin-bottom:6px">메뉴판</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+              ${(b.menuPhotos||b.menu||[]).map(p=>typeof p==='string'?`<img src="${p}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px">`:``).filter(Boolean).join('')}
+            </div>
+          </div>`:
+          (b.menuPhotos&&b.menuPhotos.length)?`
+          <div style="margin-top:14px">
+            <div class="muted" style="font-size:11px;margin-bottom:6px">메뉴판</div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">
+              ${b.menuPhotos.map(p=>`<img src="${p}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px">`).join('')}
             </div>
           </div>`:''}
 
@@ -713,7 +720,6 @@ window.openBizEdit=async(bizId)=>{
   const s = await getDoc(doc(NW.db,'nw_biz',bizId));
   if(!s.exists()){ toast('매장 없음'); return; }
   const b = s.data();
-  window._editBizMenus = b.menu || [];
 
   const overlay = document.createElement('div');
   overlay.id = 'bizEditOverlay';
@@ -758,12 +764,17 @@ window.openBizEdit=async(bizId)=>{
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">소개글</div>
           <textarea class="inp" id="beDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="margin:0;resize:vertical">${b.desc||''}</textarea></div>
         <div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div class="muted" style="font-size:12px;font-weight:700">메뉴</div>
-            <button onclick="addMenuRow()" style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">+ 메뉴 추가</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="muted" style="font-size:12px;font-weight:700">메뉴판 사진 <span id="adminMenuCnt">0</span>/5장</div>
+            <div style="display:flex;gap:6px">
+              <button onclick="document.getElementById('adminMenuFile').click()" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일 추가</button>
+              <button onclick="adminMenuByUrl()" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL 추가</button>
+            </div>
           </div>
-          <div id="beMenuList" style="display:flex;flex-direction:column;gap:6px"></div>
-          <div class="muted" style="font-size:11px;margin-top:6px">메뉴명과 가격을 입력하세요.</div>
+          <input type="file" id="adminMenuFile" accept="image/*" class="hide" onchange="handleAdminMenuUpload(event,'${bizId}')">
+          <div id="adminMenuGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;min-height:60px"></div>
+          <div id="adminMenuStatus" style="font-size:11px;color:var(--tx3);margin-top:6px"></div>
+          <input type="hidden" id="adminMenuUrls" value="${JSON.stringify(b.menuPhotos||[]).replace(/"/g,'&quot;')}">
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">수신 반경</div>
@@ -841,44 +852,78 @@ window.removeAdminPhoto=(idx)=>{
   renderAdminGallery(urls);
 };
 
-// 메뉴 초기화
+// 메뉴판 사진 초기화
 setTimeout(()=>{
-  const el = document.getElementById('beMenuList');
-  if(el){
-    const existing = window._editBizMenus || [];
-    existing.forEach(m => addMenuRow(m.name, m.price));
-    if(!existing.length) addMenuRow();
-  }
   const photoEl = document.getElementById('adminPhotoGallery');
   if(photoEl){ const urls=getAdminPhotos(); renderAdminGallery(urls); document.getElementById('adminPhotoCnt').textContent=urls.length; }
+  const menuEl = document.getElementById('adminMenuGallery');
+  if(menuEl){ const urls=getAdminMenuPhotos(); renderAdminMenuGallery(urls); document.getElementById('adminMenuCnt').textContent=urls.length; }
 },100);
 
-window.addMenuRow=(name='', price='')=>{
-  const el = document.getElementById('beMenuList');
-  if(!el) return;
-  const row = document.createElement('div');
-  row.style.cssText='display:flex;gap:6px;align-items:center';
-  row.innerHTML=`
-    <input placeholder="메뉴명 (예: 소주)" value="${name}" style="flex:2;padding:10px 12px;border-radius:8px;border:1.5px solid var(--bd);background:var(--bg);color:var(--tx);font-family:inherit;font-size:13px">
-    <input placeholder="가격 (예: 5000)" value="${price}" type="number" style="flex:1;padding:10px 12px;border-radius:8px;border:1.5px solid var(--bd);background:var(--bg);color:var(--tx);font-family:inherit;font-size:13px">
-    <button onclick="this.parentElement.remove()" style="background:var(--nobg);color:var(--no);border:none;width:30px;height:30px;border-radius:6px;font-size:14px;cursor:pointer;flex-shrink:0">✕</button>`;
-  el.appendChild(row);
-};
-
-function getMenuItems(){
-  const rows = document.getElementById('beMenuList')?.children || [];
-  return Array.from(rows).map(row=>{
-    const inputs = row.querySelectorAll('input');
-    const name = inputs[0]?.value.trim();
-    const price = inputs[1]?.value.trim();
-    return name ? {name, price: price ? parseInt(price) : 0} : null;
-  }).filter(Boolean);
+function getAdminMenuPhotos(){
+  try{ return JSON.parse(document.getElementById('adminMenuUrls').value.replace(/&quot;/g,'"'))||[]; }
+  catch(e){ return []; }
 }
+function setAdminMenuPhotos(urls){
+  document.getElementById('adminMenuUrls').value = JSON.stringify(urls).replace(/"/g,'&quot;');
+  document.getElementById('adminMenuCnt').textContent = urls.length;
+}
+function renderAdminMenuGallery(urls){
+  const el = document.getElementById('adminMenuGallery');
+  if(!el) return;
+  if(!urls.length){
+    el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">메뉴판 사진을 추가해주세요 (최대 5장)</div>`;
+    return;
+  }
+  el.innerHTML = urls.map((u,i)=>`
+    <div style="position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover">
+      <button onclick="removeAdminMenuPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer">✕</button>
+    </div>`).join('');
+}
+window.handleAdminMenuUpload=async(event, bizId)=>{
+  const file = event.target.files[0];
+  if(!file) return;
+  const urls = getAdminMenuPhotos();
+  if(urls.length >= 5){ toast('메뉴판 사진은 최대 5장까지 가능해요'); return; }
+  const statusEl = document.getElementById('adminMenuStatus');
+  statusEl.textContent='⏳ 업로드 중…'; statusEl.style.color='var(--tx3)';
+  try{
+    // 메뉴 사진은 menu_photos/ 경로에 저장
+    const {storageRef, uploadBytes, getDownloadURL} = NW.fb;
+    const path = `menu_photos/${bizId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+    const ref = storageRef(NW.storage, path);
+    await uploadBytes(ref, file);
+    const url = await getDownloadURL(ref);
+    urls.push(url);
+    setAdminMenuPhotos(urls);
+    renderAdminMenuGallery(urls);
+    statusEl.textContent='✅ 업로드 완료'; statusEl.style.color='var(--ok)';
+  }catch(e){
+    statusEl.textContent='❌ 실패: '+e.message; statusEl.style.color='var(--no)';
+  }
+  event.target.value='';
+};
+window.adminMenuByUrl=()=>{
+  const urls = getAdminMenuPhotos();
+  if(urls.length >= 5){ toast('메뉴판 사진은 최대 5장까지 가능해요'); return; }
+  const url = prompt('메뉴판 사진 URL을 입력하세요:');
+  if(!url||!url.trim()) return;
+  urls.push(url.trim());
+  setAdminMenuPhotos(urls);
+  renderAdminMenuGallery(urls);
+};
+window.removeAdminMenuPhoto=(idx)=>{
+  const urls = getAdminMenuPhotos();
+  urls.splice(idx,1);
+  setAdminMenuPhotos(urls);
+  renderAdminMenuGallery(urls);
+};
 
 window.saveBizEdit=async(bizId)=>{
   const {doc,updateDoc} = NW.fb;
   const photos = getAdminPhotos();
-  const menu = getMenuItems();
+  const menuPhotos = getAdminMenuPhotos();
   const data = {
     name: document.getElementById('beN').value.trim(),
     cat: document.getElementById('beCat').value,
@@ -887,7 +932,7 @@ window.saveBizEdit=async(bizId)=>{
     hours: document.getElementById('beHours').value.trim(),
     website: document.getElementById('beWeb').value.trim(),
     desc: document.getElementById('beDesc').value.trim(),
-    menu,
+    menuPhotos,
     radius: parseInt(document.getElementById('beRad').value),
     minParty: parseInt(document.getElementById('beMin').value),
     photos,

@@ -1,16 +1,27 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // 매장 사진 — 로그인한 사용자는 누구나 업로드 가능 (매장 오너 본인이 업로드)
-    // 실제 운영 시에는 bizId == request.auth.uid 검증을 강화할 수 있음
     match /biz_photos/{bizId}/{fileName} {
-      allow read: if true;  // 사진은 누구나 볼 수 있음 (공개)
+      allow read: if true;
       allow write: if request.auth != null
-        && request.auth.uid == bizId
-        && request.resource.size < 5 * 1024 * 1024  // 5MB 제한
+        && (request.auth.uid == bizId
+            || request.auth.token.email in ['urildlduri@gmail.com','liferefix@naver.com'])
+        && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null && request.auth.uid == bizId;
+      allow delete: if request.auth != null
+        && (request.auth.uid == bizId
+            || request.auth.token.email in ['urildlduri@gmail.com','liferefix@naver.com']);
+    }
+    match /menu_photos/{bizId}/{fileName} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && (request.auth.uid == bizId
+            || request.auth.token.email in ['urildlduri@gmail.com','liferefix@naver.com'])
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null
+        && (request.auth.uid == bizId
+            || request.auth.token.email in ['urildlduri@gmail.com','liferefix@naver.com']);
     }
   }
 }
