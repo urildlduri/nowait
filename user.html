@@ -1593,11 +1593,11 @@ async function loadInfoNotices(){
   infoTabLoaded.notice = true;
   const el = $('infoNoticeList');
   try{
-    const {collection,query,where,orderBy,getDocs} = NW.fb;
-    let snap;
-    try{ snap = await getDocs(query(collection(NW.db,'nw_notices'), where('active','==',true), orderBy('order','asc'))); }
-    catch(e){ snap = await getDocs(collection(NW.db,'nw_notices')); }
-    const list = snap.docs.map(d=>({id:d.id,...d.data()})).filter(n=>n.active).sort((a,b)=>(a.order||0)-(b.order||0));
+    const {collection,getDocs} = NW.fb;
+    const snap = await getDocs(collection(NW.db,'nw_notices'));
+    const list = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(n=>n.active && n.type!=='event')
+      .sort((a,b)=>(a.order||0)-(b.order||0));
     if(!list.length){ el.innerHTML='<div class="muted" style="text-align:center;padding:40px 0">등록된 공지가 없어요</div>'; return; }
     el.innerHTML = list.map(n=>{
       const t = n.createdAt?.toDate ? n.createdAt.toDate() : null;
@@ -1620,11 +1620,11 @@ async function loadInfoEvents(){
   infoTabLoaded.event = true;
   const el = $('infoEventList');
   try{
-    const {collection,query,where,orderBy,getDocs} = NW.fb;
-    let snap;
-    try{ snap = await getDocs(query(collection(NW.db,'nw_notices'), where('active','==',true), where('type','==','event'), orderBy('order','asc'))); }
-    catch(e){ snap = await getDocs(collection(NW.db,'nw_notices')); }
-    const list = snap.docs.map(d=>({id:d.id,...d.data()})).filter(n=>n.active && n.type==='event');
+    const {collection,getDocs} = NW.fb;
+    const snap = await getDocs(collection(NW.db,'nw_notices'));
+    const list = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(n=>n.active && n.type==='event')
+      .sort((a,b)=>(a.order||0)-(b.order||0));
     if(!list.length){ el.innerHTML='<div class="muted" style="text-align:center;padding:40px 0">진행 중인 이벤트가 없어요</div>'; return; }
     el.innerHTML = list.map(n=>`
       <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad);padding:16px;margin-bottom:10px">
@@ -1681,23 +1681,15 @@ window.postTogether=async()=>{
 
 async function loadNotices(){
   try{
-    const {collection,query,where,orderBy,getDocs} = NW.fb;
-    const snap = await getDocs(query(
-      collection(NW.db,'nw_notices'),
-      where('active','==',true),
-      orderBy('order','asc')
-    ));
-    const notices = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const {collection,getDocs} = NW.fb;
+    const snap = await getDocs(collection(NW.db,'nw_notices'));
+    const notices = snap.docs.map(d=>({id:d.id,...d.data()}))
+      .filter(n=>n.active)
+      .sort((a,b)=>(a.order||0)-(b.order||0));
     if(!notices.length){ $('noticeBanner').classList.add('hide'); return; }
     renderNoticeBanner(notices);
   }catch(e){
-    // 인덱스 없으면 폴백
-    try{
-      const {collection,getDocs} = NW.fb;
-      const snap = await getDocs(collection(NW.db,'nw_notices'));
-      const notices = snap.docs.map(d=>({id:d.id,...d.data()})).filter(n=>n.active).sort((a,b)=>(a.order||0)-(b.order||0));
-      if(notices.length) renderNoticeBanner(notices);
-    }catch(e2){}
+    $('noticeBanner').classList.add('hide');
   }
 }
 
