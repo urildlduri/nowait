@@ -170,6 +170,15 @@
       <div id="myHist"><div class="muted">아직 기록이 없어요.</div></div>
 
       <div class="sec-divider"></div>
+      <div class="h2">🔑 비밀번호 변경</div>
+      <div class="statbox" style="margin-top:0">
+        <input class="inp" id="pwCurrent" type="password" placeholder="현재 비밀번호" style="margin-top:0">
+        <input class="inp" id="pwNew" type="password" placeholder="새 비밀번호 (8자 이상)" style="margin-top:10px">
+        <input class="inp" id="pwNew2" type="password" placeholder="새 비밀번호 확인" style="margin-top:10px">
+        <button class="cta" onclick="changePassword()" style="margin-top:14px">변경하기</button>
+      </div>
+
+      <div class="sec-divider"></div>
       <div class="h2">개인정보 관리</div>
       <div class="statbox" style="margin-top:0">
         <button class="cta ghost" style="margin-top:0" onclick="downloadMyData()">📥 내 데이터 내려받기 (JSON)</button>
@@ -1444,6 +1453,35 @@ window.submitPartner=async()=>{
 window.addEventListener('beforeunload',()=>{if(callUnsub)callUnsub();});
 
 /* ── 개인정보 관리 (D: 다운로드, B: 탈퇴/삭제) ── */
+window.changePassword=async()=>{
+  const cur = $('pwCurrent').value;
+  const pw1 = $('pwNew').value;
+  const pw2 = $('pwNew2').value;
+  if(!cur){ toast('현재 비밀번호를 입력해주세요'); return; }
+  if(pw1.length < 8){ toast('새 비밀번호는 8자 이상이어야 합니다'); return; }
+  if(pw1 !== pw2){ toast('새 비밀번호가 일치하지 않습니다'); return; }
+  if(pw1 === cur){ toast('현재 비밀번호와 같아요. 다른 비밀번호를 입력해주세요'); return; }
+  try{
+    const {EmailAuthProvider, reauthenticateWithCredential, updatePassword} = NW.fb;
+    const user = NW.auth.currentUser;
+    // 재인증 (현재 비번 확인)
+    const credential = EmailAuthProvider.credential(user.email, cur);
+    await reauthenticateWithCredential(user, credential);
+    // 비번 변경
+    await updatePassword(user, pw1);
+    toast('✅ 비밀번호가 변경됐어요');
+    $('pwCurrent').value=''; $('pwNew').value=''; $('pwNew2').value='';
+  }catch(e){
+    const map={
+      'auth/wrong-password':'현재 비밀번호가 틀렸어요',
+      'auth/invalid-credential':'현재 비밀번호가 틀렸어요',
+      'auth/weak-password':'새 비밀번호가 너무 약합니다',
+      'auth/requires-recent-login':'보안을 위해 다시 로그인 후 시도해주세요'
+    };
+    toast('실패: '+(map[e.code]||e.message));
+  }
+};
+
 window.downloadMyData=async()=>{
   if(!NW.uid){toast('로그인 필요');return;}
   toast('내 데이터를 수집하는 중…');
