@@ -105,6 +105,14 @@
         <button class="chip" id="eReserv" onclick="this.classList.toggle('on')">📅 예약</button></div></div>
     <button class="cta" onclick="saveEdit()">저장하기</button>
     <button class="cta ghost" style="margin-top:10px" onclick="subShow('m-console')">취소</button>
+
+    <div style="margin-top:30px;border-top:1px solid var(--bd);padding-top:24px">
+      <div class="h2">🔑 비밀번호 변경</div>
+      <input class="inp" id="mPwCurrent" type="password" placeholder="현재 비밀번호" style="margin-top:0">
+      <input class="inp" id="mPwNew" type="password" placeholder="새 비밀번호 (8자 이상)" style="margin-top:10px">
+      <input class="inp" id="mPwNew2" type="password" placeholder="새 비밀번호 확인" style="margin-top:10px">
+      <button class="cta ghost" onclick="changeMerchantPw()" style="margin-top:14px">비밀번호 변경</button>
+    </div>
   </div>
 </div>
 
@@ -326,6 +334,33 @@ async function drawEditMap(){
     });
   }catch(e){ box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:12px;text-align:center;padding:10px">지도 로드 실패 — 좌표는 직접 입력 가능</div>'; }
 }
+window.changeMerchantPw=async()=>{
+  const cur = $('mPwCurrent').value;
+  const pw1 = $('mPwNew').value;
+  const pw2 = $('mPwNew2').value;
+  if(!cur){ toast('현재 비밀번호를 입력해주세요'); return; }
+  if(pw1.length < 8){ toast('새 비밀번호는 8자 이상이어야 합니다'); return; }
+  if(pw1 !== pw2){ toast('새 비밀번호가 일치하지 않습니다'); return; }
+  if(pw1 === cur){ toast('현재 비밀번호와 같아요'); return; }
+  try{
+    const {EmailAuthProvider, reauthenticateWithCredential, updatePassword} = NW.fb;
+    const user = NW.auth.currentUser;
+    const credential = EmailAuthProvider.credential(user.email, cur);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, pw1);
+    toast('✅ 비밀번호가 변경됐어요');
+    $('mPwCurrent').value=''; $('mPwNew').value=''; $('mPwNew2').value='';
+  }catch(e){
+    const map={
+      'auth/wrong-password':'현재 비밀번호가 틀렸어요',
+      'auth/invalid-credential':'현재 비밀번호가 틀렸어요',
+      'auth/weak-password':'새 비밀번호가 너무 약합니다',
+      'auth/requires-recent-login':'보안을 위해 다시 로그인 후 시도해주세요'
+    };
+    toast('실패: '+(map[e.code]||e.message));
+  }
+};
+
 window.saveEdit=async()=>{
   const lat=parseFloat($('eLat').value), lng=parseFloat($('eLng').value);
   if(!$('eName').value.trim()){toast('매장 이름을 입력하세요');return;}
