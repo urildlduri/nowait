@@ -4,7 +4,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return request.auth != null
-        && request.auth.token.email in ['urildlduri@gmail.com'];
+        && request.auth.token.email in ['urildlduri@gmail.com','liferefix@naver.com'];
     }
     function signedIn() { return request.auth != null; }
 
@@ -15,17 +15,17 @@ service cloud.firestore {
       match /history/{doc} {
         allow read, write: if request.auth.uid == uid;
       }
+      match /points/{doc} {
+        allow read, write: if request.auth.uid == uid;
+      }
     }
 
     match /nw_biz/{id} {
       allow read: if signedIn();
-      // 일반 사용자: 본인 명의 + 미승인 상태로만 생성 가능 (파트너 신청)
-      // 관리자: 임의 ownerId + 승인 상태로 즉시 생성 가능 (현장 영업용 사전 생성)
       allow create: if isAdmin()
         || (signedIn()
             && request.resource.data.ownerId == request.auth.uid
             && request.resource.data.approved == false);
-      // 수정: 관리자 / 오너 / 멤버 / 또는 평점 필드만 갱신(리뷰 작성·삭제 시)
       allow update: if isAdmin()
         || (signedIn() && resource.data.ownerId == request.auth.uid
             && request.resource.data.approved == resource.data.approved)
@@ -40,7 +40,6 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // 리뷰 (1매장 1사용자 — 문서 id가 bizId_uid)
     match /nw_reviews/{rid} {
       allow read: if signedIn();
       allow create, update: if signedIn()
@@ -53,10 +52,6 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if signedIn()
         && request.resource.data.callerId == request.auth.uid;
-      // 호출 수정 허용:
-      // - 호출자 본인 (취소·갈게요·도착·노쇼 등 모든 상태 변경)
-      // - 로그인된 누구나 status를 '매칭/수락/진행/완료/노쇼/취소/만료' 중 하나로 설정 가능
-      //   (매장이 손님 매칭 응답 + 도착확인 + 노쇼 처리 등)
       allow update: if signedIn() && (
         resource.data.callerId == request.auth.uid
         || request.resource.data.status in ['matched','accepted','going','done','noshow','cancelled','expired']
@@ -67,6 +62,23 @@ service cloud.firestore {
         allow read: if signedIn();
         allow write: if signedIn();
       }
+    }
+
+    match /nw_community/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid)
+        || (signedIn() && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['likes','commentCount']));
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+    }
+
+    match /nw_hotplaces/{id} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
   }
 }

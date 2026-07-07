@@ -544,15 +544,18 @@ window.openBizDetail=async(bizId)=>{
     const created = b.createdAt?.toDate ? b.createdAt.toDate() : null;
     const createdStr = created ? `${created.getFullYear()}.${created.getMonth()+1}.${created.getDate()}` : '-';
 
-    // 팝업 생성
     const overlay = document.createElement('div');
+    overlay.id = 'bizDetailOverlay';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:flex-end;justify-content:center';
     overlay.innerHTML = `
-      <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:28px;max-height:80vh;overflow-y:auto">
+      <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:28px;max-height:85vh;overflow-y:auto">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <div style="font-size:20px;font-weight:800">${cat.e} ${b.name||'-'}</div>
-          <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
+          <button onclick="document.getElementById('bizDetailOverlay').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
         </div>
+
+        ${b.photo?`<img src="${b.photo}" style="width:100%;border-radius:12px;margin-bottom:14px;max-height:200px;object-fit:cover">`:''}
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
           <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">업종</div><b>${cat.n}</b></div>
           <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">상태</div>
@@ -570,18 +573,136 @@ window.openBizDetail=async(bizId)=>{
           <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">등록일</div><b>${createdStr}</b></div>
           <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">직원</div><b>${(b.memberEmails||[]).length}명</b></div>
         </div>
-        ${b.photo?`<img src="${b.photo}" style="width:100%;border-radius:12px;margin-top:14px;max-height:200px;object-fit:cover">`:''}
-        <div style="display:flex;gap:8px;margin-top:16px">
-          <button onclick="toggleHot('${bizId}',${!b.isHot})" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:${b.isHot?'var(--soonbg)':'var(--okbg)'};color:${b.isHot?'var(--soon)':'var(--ok)'};border:none;cursor:pointer">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:16px">
+          <button onclick="openBizEdit('${bizId}')" style="padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:var(--y);color:#000;border:none;cursor:pointer">✏️ 정보 편집</button>
+          <button onclick="toggleHot('${bizId}',${!b.isHot})" style="padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:${b.isHot?'var(--soonbg)':'var(--okbg)'};color:${b.isHot?'var(--soon)':'var(--ok)'};border:none;cursor:pointer">
             ${b.isHot?'🔥 핫플 OFF':'🔥 핫플 ON'}
           </button>
-          <button onclick="toggleApprove('${bizId}',${!b.approved})" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:${b.approved?'var(--nobg)':'var(--okbg)'};color:${b.approved?'var(--no)':'var(--ok)'};border:none;cursor:pointer">
+          <button onclick="toggleApprove('${bizId}',${!b.approved})" style="padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:${b.approved?'var(--nobg)':'var(--okbg)'};color:${b.approved?'var(--no)':'var(--ok)'};border:none;cursor:pointer">
             ${b.approved?'❌ 승인 취소':'✅ 승인'}
           </button>
         </div>
       </div>`;
     document.body.appendChild(overlay);
     overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.remove(); });
+  }catch(e){ toast('실패: '+e.message); }
+};
+
+/* ── 관리자 매장 정보 편집 모달 ── */
+window.openBizEdit=async(bizId)=>{
+  document.getElementById('bizDetailOverlay')?.remove();
+  const {doc,getDoc} = NW.fb;
+  const s = await getDoc(doc(NW.db,'nw_biz',bizId));
+  if(!s.exists()){ toast('매장 없음'); return; }
+  const b = s.data();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'bizEditOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:300;display:flex;align-items:flex-end;justify-content:center;overflow-y:auto';
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:28px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="font-size:18px;font-weight:800">✏️ 매장 정보 편집</div>
+        <button onclick="document.getElementById('bizEditOverlay').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
+      </div>
+
+      <!-- 사진 업로드 -->
+      <div style="margin-bottom:18px">
+        <div class="muted" style="font-size:12px;font-weight:700;margin-bottom:8px">대표 사진</div>
+        <div id="adminPhotoPreview" style="width:100%;height:160px;border-radius:12px;background:var(--bg3);border:1px dashed var(--bd);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px;color:var(--tx3);font-size:13px;cursor:pointer" onclick="document.getElementById('adminPhotoFile').click()">
+          ${b.photo?`<img src="${b.photo}" style="width:100%;height:100%;object-fit:cover">`:'📷 클릭해서 사진 선택'}
+        </div>
+        <input type="file" id="adminPhotoFile" accept="image/*" class="hide" onchange="handleAdminPhotoUpload(event,'${bizId}')">
+        <div style="display:flex;gap:8px">
+          <button onclick="document.getElementById('adminPhotoFile').click()" style="flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일 업로드</button>
+          <button onclick="adminPhotoByUrl('${bizId}')" style="flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL 입력</button>
+        </div>
+        <div id="adminPhotoStatus" style="font-size:11px;color:var(--tx3);margin-top:6px"></div>
+        <input type="hidden" id="adminPhotoUrl" value="${b.photo||''}">
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">매장명</div>
+          <input class="inp" id="beN" value="${b.name||''}" placeholder="매장명" style="margin:0"></div>
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">업종</div>
+          <select class="inp" id="beCat" style="margin:0">
+            ${(NW.CATS||[]).map(c=>`<option value="${c.k}" ${b.cat===c.k?'selected':''}>${c.e} ${c.n}</option>`).join('')}
+          </select></div>
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">주소</div>
+          <input class="inp" id="beAddr" value="${b.addr||''}" placeholder="주소" style="margin:0"></div>
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">전화번호</div>
+          <input class="inp" id="bePhone" value="${b.phone||''}" placeholder="02-000-0000" style="margin:0"></div>
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">영업시간</div>
+          <input class="inp" id="beHours" value="${b.hours||''}" placeholder="매일 17:00 – 02:00" style="margin:0"></div>
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">홈페이지 URL</div>
+          <input class="inp" id="beWeb" value="${b.website||''}" placeholder="https://..." style="margin:0"></div>
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">소개글</div>
+          <textarea class="inp" id="beDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="margin:0;resize:vertical">${b.desc||''}</textarea></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">수신 반경</div>
+            <select class="inp" id="beRad" style="margin:0">
+              ${[500,1000,1500,2000,3000].map(r=>`<option value="${r}" ${(b.radius||1000)===r?'selected':''}>${r}m</option>`).join('')}
+            </select></div>
+          <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">최소 인원</div>
+            <select class="inp" id="beMin" style="margin:0">
+              ${[1,2,3,4,5].map(n=>`<option value="${n}" ${(b.minParty||1)===n?'selected':''}>${n}명+</option>`).join('')}
+            </select></div>
+        </div>
+      </div>
+
+      <button onclick="saveBizEdit('${bizId}')" style="width:100%;padding:15px;background:var(--y);color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;margin-top:20px;cursor:pointer">저장하기</button>
+      <button onclick="document.getElementById('bizEditOverlay').remove()" style="width:100%;padding:12px;background:var(--bg3);color:var(--tx2);border:none;border-radius:12px;font-size:14px;font-weight:700;margin-top:8px;cursor:pointer">취소</button>
+    </div>`;
+  document.body.appendChild(overlay);
+};
+
+window.handleAdminPhotoUpload=async(event, bizId)=>{
+  const file = event.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('adminPhotoStatus');
+  statusEl.textContent='⏳ 업로드 중…'; statusEl.style.color='var(--tx3)';
+  try{
+    const url = await NW.uploadBizPhoto(file, bizId);
+    document.getElementById('adminPhotoUrl').value = url;
+    const preview = document.getElementById('adminPhotoPreview');
+    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+    statusEl.textContent='✅ 업로드 완료'; statusEl.style.color='var(--ok)';
+  }catch(e){
+    statusEl.textContent='❌ 실패: '+e.message; statusEl.style.color='var(--no)';
+  }
+  event.target.value='';
+};
+
+window.adminPhotoByUrl=(bizId)=>{
+  const url = prompt('사진 URL을 입력하세요 (네이버 플레이스, 인스타 등):');
+  if(!url) return;
+  document.getElementById('adminPhotoUrl').value = url;
+  const preview = document.getElementById('adminPhotoPreview');
+  preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+  document.getElementById('adminPhotoStatus').textContent='✅ URL 설정 완료';
+};
+
+window.saveBizEdit=async(bizId)=>{
+  const {doc,updateDoc} = NW.fb;
+  const data = {
+    name: document.getElementById('beN').value.trim(),
+    cat: document.getElementById('beCat').value,
+    addr: document.getElementById('beAddr').value.trim(),
+    phone: document.getElementById('bePhone').value.trim(),
+    hours: document.getElementById('beHours').value.trim(),
+    website: document.getElementById('beWeb').value.trim(),
+    desc: document.getElementById('beDesc').value.trim(),
+    radius: parseInt(document.getElementById('beRad').value),
+    minParty: parseInt(document.getElementById('beMin').value),
+    photo: document.getElementById('adminPhotoUrl').value,
+  };
+  if(!data.name){ toast('매장명을 입력해주세요'); return; }
+  try{
+    await updateDoc(doc(NW.db,'nw_biz',bizId), data);
+    toast('✅ 매장 정보 저장 완료');
+    document.getElementById('bizEditOverlay')?.remove();
+    loadMemberList();
   }catch(e){ toast('실패: '+e.message); }
 };
 
