@@ -57,7 +57,12 @@
       <textarea class="inp" id="ntBody" placeholder="내용" rows="3" style="margin-top:0;margin-bottom:8px;resize:vertical"></textarea>
       <input class="inp" id="ntImage" placeholder="이미지 URL (선택)" style="margin-top:0;margin-bottom:8px">
       <input class="inp" id="ntLink" placeholder="링크 URL (선택, 자세히 보기)" style="margin-top:0;margin-bottom:8px">
-      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+      <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <label style="font-size:13px;font-weight:600;color:var(--tx2)">유형</label>
+        <select id="ntType" style="padding:8px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:13px">
+          <option value="notice">📢 공지</option>
+          <option value="event">🎉 이벤트</option>
+        </select>
         <label style="font-size:13px;font-weight:600;color:var(--tx2)">순서</label>
         <input type="number" id="ntOrder" value="0" min="0" style="width:60px;padding:8px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:13px">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--tx2);cursor:pointer">
@@ -376,10 +381,12 @@ window.saveNotice=async()=>{
   if(!title && !body){ toast('제목 또는 내용을 입력해주세요'); return; }
   try{
     await addDoc(collection(NW.db,'nw_notices'),{
-      title, body, image, link, order, active, createdAt:serverTimestamp()
+      title, body, image, link, order, active,
+      type: $('ntType').value || 'notice',
+      createdAt:serverTimestamp()
     });
     toast('📢 공지 등록 완료');
-    $('ntTitle').value=''; $('ntBody').value=''; $('ntImage').value=''; $('ntLink').value=''; $('ntOrder').value='0'; $('ntActive').checked=true;
+    $('ntTitle').value=''; $('ntBody').value=''; $('ntImage').value=''; $('ntLink').value=''; $('ntOrder').value='0'; $('ntActive').checked=true; $('ntType').value='notice';
     loadNoticeList();
   }catch(e){ toast('실패: '+e.message); }
 };

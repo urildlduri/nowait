@@ -24,6 +24,8 @@
 .ring-num span{font-size:28px;color:var(--y)}.ring-num small{font-size:11px;color:var(--tx3);margin-top:-2px}
 .ring-info{flex:1}.ring-info b{display:block;font-size:14px;font-weight:800}.ring-info small{color:var(--tx3);font-size:12px}
 .sec-divider{height:1px;background:var(--bd);margin:24px 0}
+.info-tab{flex:1;background:none;padding:10px 4px;font-size:12px;font-weight:700;color:var(--tx3);border-bottom:2px solid transparent;cursor:pointer;transition:.12s}
+.info-tab.on{color:var(--y);border-bottom-color:var(--y)}
 </style>
 </head>
 <body>
@@ -37,6 +39,12 @@
   <!-- 홈 -->
   <div id="u-home" class="scr on">
     <div class="page" style="padding:0 0 24px">
+
+      <!-- 공지 슬라이드 배너 -->
+      <div id="noticeBanner" class="hide" style="position:relative;overflow:hidden;background:var(--bg2);border-bottom:1px solid var(--bd)">
+        <div id="noticeSlides" style="display:flex;transition:transform .4s ease;will-change:transform"></div>
+        <div id="noticeDots" style="display:flex;justify-content:center;gap:5px;padding:8px 0 10px"></div>
+      </div>
 
       <!-- 상단 카테고리 슬라이드 -->
       <div style="background:var(--bg2);padding:18px 0;border-bottom:1px solid var(--bd)">
@@ -167,6 +175,73 @@
   </div>
 
   <!-- MY -->
+  <!-- 정보 탭 -->
+  <div id="u-info" class="scr">
+    <div class="page">
+      <div class="h1">정보</div>
+
+      <!-- 서브 탭 -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--bd);margin:16px 0">
+        <button class="info-tab on" id="itab-notice" onclick="switchInfoTab('notice')">📢 공지</button>
+        <button class="info-tab" id="itab-event" onclick="switchInfoTab('event')">🎉 이벤트</button>
+        <button class="info-tab" id="itab-howto" onclick="switchInfoTab('howto')">📖 사용법</button>
+        <button class="info-tab" id="itab-together" onclick="switchInfoTab('together')">🤝 같이가요</button>
+      </div>
+
+      <!-- 공지 -->
+      <div id="info-notice">
+        <div id="infoNoticeList"><div class="muted" style="text-align:center;padding:40px 0">불러오는 중…</div></div>
+      </div>
+
+      <!-- 이벤트 -->
+      <div id="info-event" class="hide">
+        <div id="infoEventList"><div class="muted" style="text-align:center;padding:40px 0">불러오는 중…</div></div>
+      </div>
+
+      <!-- 사용법 -->
+      <div id="info-howto" class="hide">
+        <div style="display:flex;flex-direction:column;gap:14px;margin-top:8px">
+          <div class="statbox" style="border-left:3px solid var(--y)">
+            <div style="font-size:16px;font-weight:800;margin-bottom:6px">1️⃣ 인원 선택</div>
+            <div style="font-size:14px;color:var(--tx2);line-height:1.6">오늘 몇 명이서 움직이는지 선택해요. 1명부터 5명 이상까지 가능해요.</div>
+          </div>
+          <div class="statbox" style="border-left:3px solid var(--y)">
+            <div style="font-size:16px;font-weight:800;margin-bottom:6px">2️⃣ 카테고리 선택</div>
+            <div style="font-size:14px;color:var(--tx2);line-height:1.6">술집, 노래방, 포차 등 가고 싶은 곳을 선택해요. 여러 개 동시에 선택 가능!</div>
+          </div>
+          <div class="statbox" style="border-left:3px solid var(--y)">
+            <div style="font-size:16px;font-weight:800;margin-bottom:6px">3️⃣ 위치 확인</div>
+            <div style="font-size:14px;color:var(--tx2);line-height:1.6">현재 위치를 자동으로 잡아줘요. 안 잡히면 주소 검색으로 직접 선택할 수 있어요.</div>
+          </div>
+          <div class="statbox" style="border-left:3px solid var(--y)">
+            <div style="font-size:16px;font-weight:800;margin-bottom:6px">4️⃣ 호출하기</div>
+            <div style="font-size:14px;color:var(--tx2);line-height:1.6">주변 매장에 "지금 가능해요?" 호출을 보내요. 매장이 응답하면 알림이 와요.</div>
+          </div>
+          <div class="statbox" style="border-left:3px solid var(--y)">
+            <div style="font-size:16px;font-weight:800;margin-bottom:6px">5️⃣ 매칭 & 방문</div>
+            <div style="font-size:14px;color:var(--tx2);line-height:1.6">가고 싶은 매장을 선택하고 출발! 도착하면 완료 버튼을 눌러주세요. 포인트가 쌓여요.</div>
+          </div>
+          <div class="statbox" style="background:var(--yd);border:1px solid var(--y)">
+            <div style="font-size:14px;font-weight:700;color:var(--y)">💡 노쇼 주의!</div>
+            <div style="font-size:13px;color:var(--tx2);margin-top:4px;line-height:1.5">매칭 후 방문하지 않으면 패널티가 부과돼요. 취소할 때는 꼭 취소 버튼을 눌러주세요.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 같이가요 -->
+      <div id="info-together" class="hide">
+        <div id="infoTogetherList"></div>
+        <div style="margin-top:20px;background:var(--bg2);border:1px solid var(--bd);border-radius:var(--radL);padding:16px">
+          <div class="field-lb" style="margin-top:0">✍️ 같이 갈 사람 구해요</div>
+          <input class="inp" id="tgtTitle" placeholder="예: 오늘 밤 강남 2차 같이 가실 분!" style="margin-top:8px">
+          <textarea class="inp" id="tgtBody" placeholder="인원, 장소, 시간 등 자유롭게 적어주세요" rows="3" style="margin-top:8px;resize:vertical"></textarea>
+          <button class="cta" onclick="postTogether()" style="margin-top:8px">올리기</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <div id="u-my" class="scr">
     <div class="page">
       <div class="h1">MY</div>
@@ -291,6 +366,7 @@
   <div class="bnav">
     <button id="n-home" class="on" onclick="uGo('u-home','n-home')"><span class="bi">🔍</span>호출</button>
     <button id="n-hot" onclick="uGo('u-hot','n-hot')"><span class="bi">🔥</span>핫플</button>
+    <button id="n-info" onclick="uGo('u-info','n-info');loadInfoTab()"><span class="bi">📋</span>정보</button>
     <button id="n-partner" onclick="uGo('u-partner','n-partner')"><span class="bi">🏪</span>파트너</button>
     <button id="n-my" onclick="uGo('u-my','n-my')"><span class="bi">👤</span>MY</button>
   </div>
@@ -308,13 +384,13 @@ function subShow(id){
   $(id).classList.add('on');
   // 하단 탭은 메인 화면(홈/파트너/MY)에서만 표시. 상세·매칭·탐색 화면에선 숨김.
   const bnav=document.querySelector('.bnav');
-  if(bnav){ const mainScreens=['u-home','u-hot','u-hotdetail','u-partner','u-my']; bnav.style.display = mainScreens.includes(id)?'flex':'none'; }
+  if(bnav){ const mainScreens=['u-home','u-hot','u-hotdetail','u-partner','u-my','u-info']; bnav.style.display = mainScreens.includes(id)?'flex':'none'; }
   window.scrollTo(0,0);
 }
 window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();if(id==='u-hot')loadHotplaces(true);};
 
 function init(){
-  buildChips(); getLoc();
+  buildChips(); getLoc(); loadNotices();
   NW.onAuth(async u=>{
     if(!u){ location.href='index.html'; return; }
     const role=await NW.getRole(u);
@@ -1475,6 +1551,181 @@ window.submitPartner=async()=>{
 };
 
 window.addEventListener('beforeunload',()=>{if(callUnsub)callUnsub();});
+
+/* ══ 공지 슬라이드 배너 ══ */
+let noticeTimer = null;
+let noticeCur = 0;
+
+/* ════════════════════════════════════════════════════════════════
+   📋 정보 탭 — 공지/이벤트/사용법/같이가요
+   ════════════════════════════════════════════════════════════════ */
+let infoTabLoaded = {};
+
+window.loadInfoTab=()=>{
+  if(!infoTabLoaded.notice) loadInfoNotices();
+  if(!infoTabLoaded.together) loadTogether();
+};
+
+window.switchInfoTab=(tab)=>{
+  ['notice','event','howto','together'].forEach(t=>{
+    $(`itab-${t}`).classList.toggle('on', t===tab);
+    $(`info-${t}`).classList.toggle('hide', t!==tab);
+  });
+  if(tab==='event' && !infoTabLoaded.event) loadInfoEvents();
+  if(tab==='together' && !infoTabLoaded.together) loadTogether();
+};
+
+async function loadInfoNotices(){
+  infoTabLoaded.notice = true;
+  const el = $('infoNoticeList');
+  try{
+    const {collection,query,where,orderBy,getDocs} = NW.fb;
+    let snap;
+    try{ snap = await getDocs(query(collection(NW.db,'nw_notices'), where('active','==',true), orderBy('order','asc'))); }
+    catch(e){ snap = await getDocs(collection(NW.db,'nw_notices')); }
+    const list = snap.docs.map(d=>({id:d.id,...d.data()})).filter(n=>n.active).sort((a,b)=>(a.order||0)-(b.order||0));
+    if(!list.length){ el.innerHTML='<div class="muted" style="text-align:center;padding:40px 0">등록된 공지가 없어요</div>'; return; }
+    el.innerHTML = list.map(n=>{
+      const t = n.createdAt?.toDate ? n.createdAt.toDate() : null;
+      const dateStr = t ? `${t.getFullYear()}.${t.getMonth()+1}.${t.getDate()}` : '';
+      return `
+      <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad);padding:16px;margin-bottom:10px">
+        ${n.image?`<img src="${n.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:10px">`:''}
+        ${n.title?`<div style="font-size:15px;font-weight:800;margin-bottom:6px">${n.title}</div>`:''}
+        ${n.body?`<div style="font-size:14px;color:var(--tx2);line-height:1.6">${n.body}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+          <span style="font-size:11px;color:var(--tx3)">${dateStr}</span>
+          ${n.link?`<a href="${n.link}" target="_blank" style="font-size:12px;color:var(--y);font-weight:700">자세히 보기 →</a>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML=`<div class="muted" style="text-align:center;padding:40px 0">불러오기 실패</div>`; }
+}
+
+async function loadInfoEvents(){
+  infoTabLoaded.event = true;
+  const el = $('infoEventList');
+  try{
+    const {collection,query,where,orderBy,getDocs} = NW.fb;
+    let snap;
+    try{ snap = await getDocs(query(collection(NW.db,'nw_notices'), where('active','==',true), where('type','==','event'), orderBy('order','asc'))); }
+    catch(e){ snap = await getDocs(collection(NW.db,'nw_notices')); }
+    const list = snap.docs.map(d=>({id:d.id,...d.data()})).filter(n=>n.active && n.type==='event');
+    if(!list.length){ el.innerHTML='<div class="muted" style="text-align:center;padding:40px 0">진행 중인 이벤트가 없어요</div>'; return; }
+    el.innerHTML = list.map(n=>`
+      <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad);padding:16px;margin-bottom:10px">
+        ${n.image?`<img src="${n.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:10px">`:''}
+        ${n.title?`<div style="font-size:15px;font-weight:800;margin-bottom:6px">${n.title}</div>`:''}
+        ${n.body?`<div style="font-size:14px;color:var(--tx2);line-height:1.6">${n.body}</div>`:''}
+        ${n.link?`<a href="${n.link}" target="_blank" style="display:inline-block;margin-top:10px;font-size:12px;color:var(--y);font-weight:700">참여하기 →</a>`:''}
+      </div>`).join('');
+  }catch(e){ el.innerHTML=`<div class="muted" style="text-align:center;padding:40px 0">불러오기 실패</div>`; }
+}
+
+// 같이가요
+async function loadTogether(){
+  infoTabLoaded.together = true;
+  const el = $('infoTogetherList');
+  try{
+    const {collection,query,orderBy,getDocs,limit} = NW.fb;
+    let snap;
+    try{ snap = await getDocs(query(collection(NW.db,'nw_together'), orderBy('createdAt','desc'), limit(30))); }
+    catch(e){ snap = await getDocs(collection(NW.db,'nw_together')); }
+    const list = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!list.length){ el.innerHTML='<div class="muted" style="text-align:center;padding:30px 0">아직 글이 없어요. 첫 번째로 올려보세요!</div>'; return; }
+    el.innerHTML = list.map(n=>{
+      const t = n.createdAt?.toDate ? n.createdAt.toDate() : null;
+      const dateStr = t ? `${t.getMonth()+1}/${t.getDate()} ${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}` : '';
+      return `
+      <div style="background:var(--bg2);border:1px solid var(--bd);border-radius:var(--rad);padding:14px;margin-bottom:8px">
+        <div style="font-size:14px;font-weight:700;margin-bottom:4px">${n.title||''}</div>
+        ${n.body?`<div style="font-size:13px;color:var(--tx2);line-height:1.5">${n.body}</div>`:''}
+        <div style="font-size:11px;color:var(--tx3);margin-top:8px">${n.nickname||'익명'} · ${dateStr}</div>
+      </div>`;
+    }).join('');
+  }catch(e){ el.innerHTML=''; }
+}
+
+window.postTogether=async()=>{
+  const title = $('tgtTitle').value.trim();
+  const body = $('tgtBody').value.trim();
+  if(!title){ toast('제목을 입력해주세요'); return; }
+  const {collection,addDoc,serverTimestamp} = NW.fb;
+  try{
+    await addDoc(collection(NW.db,'nw_together'),{
+      title, body,
+      uid: NW.uid,
+      nickname: NW.profile?.nickname || NW.user?.displayName || '익명',
+      createdAt: serverTimestamp()
+    });
+    toast('✅ 글이 올라갔어요!');
+    $('tgtTitle').value=''; $('tgtBody').value='';
+    infoTabLoaded.together = false;
+    loadTogether();
+  }catch(e){ toast('실패: '+e.message); }
+};
+
+async function loadNotices(){
+  try{
+    const {collection,query,where,orderBy,getDocs} = NW.fb;
+    const snap = await getDocs(query(
+      collection(NW.db,'nw_notices'),
+      where('active','==',true),
+      orderBy('order','asc')
+    ));
+    const notices = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!notices.length){ $('noticeBanner').classList.add('hide'); return; }
+    renderNoticeBanner(notices);
+  }catch(e){
+    // 인덱스 없으면 폴백
+    try{
+      const {collection,getDocs} = NW.fb;
+      const snap = await getDocs(collection(NW.db,'nw_notices'));
+      const notices = snap.docs.map(d=>({id:d.id,...d.data()})).filter(n=>n.active).sort((a,b)=>(a.order||0)-(b.order||0));
+      if(notices.length) renderNoticeBanner(notices);
+    }catch(e2){}
+  }
+}
+
+function renderNoticeBanner(notices){
+  const banner = $('noticeBanner');
+  const slides = $('noticeSlides');
+  const dots = $('noticeDots');
+  banner.classList.remove('hide');
+
+  slides.innerHTML = notices.map((n,i)=>`
+    <div style="min-width:100%;padding:16px 20px 8px;box-sizing:border-box">
+      ${n.image?`<img src="${n.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin-bottom:10px">`:''}
+      ${n.title?`<div style="font-size:14px;font-weight:800;color:var(--tx);margin-bottom:4px">${n.title}</div>`:''}
+      ${n.body?`<div style="font-size:13px;color:var(--tx2);line-height:1.5">${n.body}</div>`:''}
+      ${n.link?`<a href="${n.link}" target="_blank" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--y);font-weight:700">자세히 보기 →</a>`:''}
+    </div>`).join('');
+
+  if(notices.length > 1){
+    dots.innerHTML = notices.map((_,i)=>`
+      <div onclick="goNotice(${i})" style="width:${i===0?'18':'6'}px;height:6px;border-radius:3px;background:${i===0?'var(--y)':'var(--bd)'};cursor:pointer;transition:.2s" id="ndot-${i}"></div>`).join('');
+    startNoticeTimer(notices.length);
+  }else{
+    dots.innerHTML='';
+  }
+}
+
+function goNotice(idx){
+  const slides = $('noticeSlides');
+  const total = slides.children.length;
+  noticeCur = (idx+total)%total;
+  slides.style.transform = `translateX(-${noticeCur*100}%)`;
+  // 도트 업데이트
+  for(let i=0;i<total;i++){
+    const d = $(`ndot-${i}`);
+    if(d){ d.style.width=i===noticeCur?'18px':'6px'; d.style.background=i===noticeCur?'var(--y)':'var(--bd)'; }
+  }
+}
+
+function startNoticeTimer(total){
+  if(noticeTimer) clearInterval(noticeTimer);
+  noticeTimer = setInterval(()=>goNotice(noticeCur+1), 4000);
+}
 
 /* ── 개인정보 관리 (D: 다운로드, B: 탈퇴/삭제) ── */
 window.changePassword=async()=>{
