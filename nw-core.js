@@ -233,11 +233,9 @@ NW.userIdSignup = async function({userId, password, name}){
   await NW.fbReady;
   if(!NW.fbLoaded) throw new Error('firebase not loaded');
   if(!/^[a-zA-Z0-9_]{4,16}$/.test(userId)) throw new Error('아이디는 영문/숫자/_ 4~16자여야 합니다');
-  const {collection, query, where, getDocs, createUserWithEmailAndPassword, updateProfile} = NW.fb;
-  // 아이디 중복 체크
-  const dup = await getDocs(query(collection(NW.db,'nw_users'), where('userId','==',userId.toLowerCase().trim())));
-  if(!dup.empty) throw new Error('이미 사용 중인 아이디입니다');
-
+  const {createUserWithEmailAndPassword, updateProfile} = NW.fb;
+  // 아이디 → 가짜 이메일 변환 후 Firebase Auth 가입
+  // 중복 아이디는 Firebase가 email-already-in-use 에러로 자동 처리
   const fakeEmail = NW.userIdToFakeEmail(userId);
   const res = await createUserWithEmailAndPassword(NW.auth, fakeEmail, password);
   if(updateProfile && name) await updateProfile(res.user, {displayName: name});
@@ -457,4 +455,3 @@ NW.myBusiness = async function(){
   if(!list.length) return null;
   return list.find(b=>b.approved)||list[0];
 };
-
