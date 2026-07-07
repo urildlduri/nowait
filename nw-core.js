@@ -181,7 +181,7 @@ NW.fbReady = (async()=>{
 if(!NW.cfgOk){const w=NW.$('cfgWarn');if(w)w.classList.remove('hide');}
 
 /* ── 관리자 이메일 화이트리스트 ── */
-NW.ADMIN_EMAILS = ["urildlduri@gmail.com"];
+NW.ADMIN_EMAILS = ["urildlduri@gmail.com", "liferefix@naver.com"];
 
 /* ── 익명 인증 (사용 안 함 — 구글 로그인으로 대체) ── */
 NW.ensureAuth = async function(){
