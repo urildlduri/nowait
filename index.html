@@ -6,6 +6,13 @@
 <title>OHdiga · 지금 어디가?</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#EF4444">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="OHdiga">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="nw.css">
 <style>
 #splash{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;transition:opacity .5s}
@@ -158,6 +165,13 @@ async function afterLogin(u){
   const biz=await NW.myBusiness();
   if(biz&&biz.approved){ location.replace('merchant.html'); return; }
   location.replace('user.html');
+}
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
 }
 </script>
 </body>

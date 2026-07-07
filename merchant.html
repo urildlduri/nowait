@@ -6,6 +6,13 @@
 <title>OHdiga · 매장 콘솔</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#EF4444">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="OHdiga">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="nw.css">
 </head>
 <body>
@@ -717,6 +724,13 @@ window.respond=async(callId,type)=>{
   const el=$('call-'+callId);if(el){const btn=el.querySelector('.resp-row');if(btn)btn.outerHTML='<div class="resp-done" style="background:var(--okbg);color:var(--ok)">✓ 응답 완료</div>';}
 };
 window.addEventListener('beforeunload',()=>{if(callsUnsub)callsUnsub();if(arrUnsub)arrUnsub();});
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>

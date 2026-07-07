@@ -1,0 +1,15 @@
+{
+  "name": "OHdiga · 지금 어디가?",
+  "short_name": "OHdiga",
+  "description": "지금 갈 수 있는 곳을 바로 찾아드려요",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F8FA",
+  "theme_color": "#EF4444",
+  "orientation": "portrait",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "categories": ["lifestyle", "travel"]
+}
