@@ -93,12 +93,17 @@
       <button class="cta ghost" style="margin-top:8px" onclick="eUseGps()">📍 현재 위치(GPS)로 설정</button>
       <div id="eMap" style="width:100%;height:200px;border-radius:var(--rad);margin-top:10px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
       <div class="muted" style="font-size:12px;margin-top:6px">지도를 탭하면 그 위치로 매장이 이동해요.</div></div>
-    <div class="field"><div class="field-lb">대표 사진</div>
-      <div id="ePhotoPreview" style="width:100%;height:160px;border-radius:var(--rad);background:var(--bg2);border:1px dashed var(--bd);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:10px;color:var(--tx3);font-size:13px">사진 없음</div>
+    <div class="field"><div class="field-lb">사진 <span id="mPhotoCnt">0</span>/10장</div>
+      <div id="mPhotoGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;min-height:60px;margin-bottom:10px"></div>
       <input type="file" id="ePhotoFile" accept="image/*" class="hide" onchange="handlePhotoSelect(event)">
-      <button class="cta ghost" style="margin-top:0" onclick="$('ePhotoFile').click()">📷 사진 선택</button>
+      <div style="display:flex;gap:8px">
+        <button class="cta ghost" style="margin-top:0;flex:1" onclick="$('ePhotoFile').click()">📷 파일 추가</button>
+        <button class="cta ghost" style="margin-top:0;flex:1" onclick="addPhotoByUrl()">🔗 URL 추가</button>
+      </div>
       <div id="ePhotoStatus" class="muted" style="font-size:12px;margin-top:6px"></div>
-      <input type="hidden" id="ePhoto"></div>
+      <input type="hidden" id="ePhoto">
+      <input type="hidden" id="ePhotos">
+    </div>
     <div class="field"><div class="field-lb">홈페이지 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
       <input class="inp" id="eWebsite" placeholder="https://..."></div>
     <div class="field"><div class="field-lb">메뉴·가격 <span style="color:var(--tx3);font-weight:500">(한 줄에 하나: 이름,가격)</span></div>
@@ -289,7 +294,10 @@ window.openEdit=()=>{
   $('eLat').value=(+myBiz.lat).toFixed(6);
   $('eLng').value=(+myBiz.lng).toFixed(6);
   $('ePhoto').value=myBiz.photo||'';
-  renderPhotoPreview(myBiz.photo||'');
+  // 사진 갤러리 초기화
+  const existingPhotos = myBiz.photos && myBiz.photos.length ? myBiz.photos : (myBiz.photo ? [myBiz.photo] : []);
+  setMerchantPhotos(existingPhotos);
+  renderMerchantGallery(existingPhotos);
   $('eWebsite').value=myBiz.website||'';
   $('eMenu').value=(myBiz.menu||[]).map(m=>`${m.name},${m.price||0}`).join('\n');
   $('eHours').value=myBiz.hours||'';
@@ -301,28 +309,59 @@ window.openEdit=()=>{
   $('eMinParty').innerHTML=[1,2,3,4].map(n=>`<button class="chip ${n===eSel.minParty?'on':''}" data-m="${n}" onclick="ePickMin(${n})">${n}명 가능${n===4?'+':''}</button>`).join('');
   drawEditMap();
 };
-function renderPhotoPreview(url){
-  const el=$('ePhotoPreview');
-  if(url){ el.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:cover">`; }
-  else{ el.innerHTML='사진 없음'; el.style.color='var(--tx3)'; }
+function getMerchantPhotos(){
+  try{ return JSON.parse($('ePhotos').value||'[]'); }catch(e){ return []; }
 }
-window.handlePhotoSelect=async(event)=>{
-  const file = event.target.files[0];
-  if(!file) return;
-  const statusEl = $('ePhotoStatus');
-  statusEl.textContent = '⏳ 업로드 중…';
-  statusEl.style.color = 'var(--tx3)';
-  try{
-    const url = await NW.uploadBizPhoto(file, myBizId);
-    $('ePhoto').value = url;
-    renderPhotoPreview(url);
-    statusEl.textContent = '✅ 업로드 완료 — 저장하기를 눌러 반영하세요';
-    statusEl.style.color = 'var(--ok)';
-  }catch(e){
-    statusEl.textContent = '❌ 실패: '+e.message;
-    statusEl.style.color = 'var(--no)';
+function setMerchantPhotos(urls){
+  $('ePhotos').value = JSON.stringify(urls);
+  $('ePhoto').value = urls[0]||'';
+  $('mPhotoCnt').textContent = urls.length;
+}
+function renderMerchantGallery(urls){
+  const el=$('mPhotoGallery');
+  if(!urls.length){
+    el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">사진을 추가해주세요 (최대 10장)</div>`;
+    return;
   }
-  event.target.value=''; // 같은 파일 재선택 가능하도록 초기화
+  el.innerHTML=urls.map((u,i)=>`
+    <div style="position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover">
+      ${i===0?'<div style="position:absolute;top:4px;left:4px;background:var(--y);color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">대표</div>':''}
+      <button onclick="removeMerchantPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer">✕</button>
+    </div>`).join('');
+}
+window.removeMerchantPhoto=(idx)=>{
+  const urls=getMerchantPhotos();
+  urls.splice(idx,1);
+  setMerchantPhotos(urls);
+  renderMerchantGallery(urls);
+};
+window.addPhotoByUrl=()=>{
+  const urls=getMerchantPhotos();
+  if(urls.length>=10){ toast('사진은 최대 10장까지 가능해요'); return; }
+  const url=prompt('사진 URL을 입력하세요:');
+  if(!url||!url.trim()) return;
+  urls.push(url.trim());
+  setMerchantPhotos(urls);
+  renderMerchantGallery(urls);
+};
+window.handlePhotoSelect=async(event)=>{
+  const file=event.target.files[0];
+  if(!file) return;
+  const urls=getMerchantPhotos();
+  if(urls.length>=10){ toast('사진은 최대 10장까지 가능해요'); return; }
+  const statusEl=$('ePhotoStatus');
+  statusEl.textContent='⏳ 업로드 중…'; statusEl.style.color='var(--tx3)';
+  try{
+    const url=await NW.uploadBizPhoto(file,myBizId);
+    urls.push(url);
+    setMerchantPhotos(urls);
+    renderMerchantGallery(urls);
+    statusEl.textContent='✅ 업로드 완료'; statusEl.style.color='var(--ok)';
+  }catch(e){
+    statusEl.textContent='❌ 실패: '+e.message; statusEl.style.color='var(--no)';
+  }
+  event.target.value='';
 };
 window.ePickCat=k=>{eSel.cat=k;document.querySelectorAll('#eCat .chip').forEach(b=>b.classList.toggle('on',b.dataset.c===k));};
 window.ePickRad=r=>{eSel.rad=r;document.querySelectorAll('#eRad .chip').forEach(b=>b.classList.toggle('on',+b.dataset.r===r));};
@@ -392,8 +431,9 @@ window.saveEdit=async()=>{
   if(!$('eName').value.trim()){toast('매장 이름을 입력하세요');return;}
   if(isNaN(lat)||isNaN(lng)){toast('위치 좌표가 필요해요');return;}
   const menu=$('eMenu').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const i=l.lastIndexOf(',');if(i<0)return{name:l,price:0};return{name:l.slice(0,i).trim(),price:parseInt(l.slice(i+1).replace(/[^0-9]/g,''))||0};});
+  const photos = getMerchantPhotos();
   const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,minParty:eSel.minParty||1,lat,lng,
-    photo:$('ePhoto').value.trim(),website:$('eWebsite').value.trim(),menu,hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
+    photo:photos[0]||'', photos, website:$('eWebsite').value.trim(),menu,hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
     parking:$('eParking').classList.contains('on'),reservation:$('eReserv').classList.contains('on')};
   const {doc,updateDoc}=NW.fb;
   await updateDoc(doc(NW.db,'nw_biz',myBizId),patch).catch(e=>{toast('저장 실패: '+e.message);throw e;});
