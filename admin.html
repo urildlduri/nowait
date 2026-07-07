@@ -423,15 +423,40 @@ window.loadMemberList=async()=>{
   $('memberList').innerHTML='<div class="adm-empty">불러오는 중…</div>';
   try{
     const {collection,getDocs,query,orderBy} = NW.fb;
-    let snap;
+    // 회원 + 매장 동시 로드
+    let uSnap, bSnap;
     try{
-      snap = await getDocs(query(collection(NW.db,'nw_users'),orderBy('createdAt','desc')));
+      [uSnap, bSnap] = await Promise.all([
+        getDocs(query(collection(NW.db,'nw_users'),orderBy('createdAt','desc'))),
+        getDocs(collection(NW.db,'nw_biz'))
+      ]);
     }catch(e){
-      // orderBy 인덱스 없을 시 폴백
-      snap = await getDocs(collection(NW.db,'nw_users'));
+      [uSnap, bSnap] = await Promise.all([
+        getDocs(collection(NW.db,'nw_users')),
+        getDocs(collection(NW.db,'nw_biz'))
+      ]);
     }
-    allMembers = snap.docs.map(d=>({id:d.id,...d.data()}));
-    $('memberCnt').textContent = allMembers.length+'명';
+    // 매장 이메일 맵 (이메일 → 매장 정보)
+    const bizByEmail = {};
+    const bizByUid = {};
+    bSnap.docs.forEach(d=>{
+      const b={id:d.id,...d.data()};
+      bizByUid[b.ownerId] = b;
+      if(b.memberEmails) b.memberEmails.forEach(e=>{ if(!bizByEmail[e]) bizByEmail[e]=b; });
+    });
+
+    allMembers = uSnap.docs.map(d=>{
+      const m={id:d.id,...d.data()};
+      // 파트너 여부 판단
+      m._biz = bizByUid[d.id] || bizByEmail[m.email] || null;
+      m._isPartner = !!m._biz;
+      return m;
+    });
+
+    const total = allMembers.length;
+    const partners = allMembers.filter(m=>m._isPartner).length;
+    const users = total - partners;
+    $('memberCnt').textContent = `${total}명 (일반 ${users} · 파트너 ${partners})`;
     renderMemberList(allMembers);
   }catch(e){
     console.error('[loadMemberList] 실패:',e);
@@ -441,34 +466,144 @@ window.loadMemberList=async()=>{
 
 function renderMemberList(list){
   if(!list.length){ $('memberList').innerHTML='<div class="adm-empty">가입된 회원이 없습니다.</div>'; return; }
-  $('memberList').innerHTML = list.map(m=>{
-    const t = m.createdAt?.toDate ? m.createdAt.toDate() : null;
-    const dateStr = t ? `${t.getFullYear()}.${t.getMonth()+1}.${t.getDate()}` : '-';
-    const isAdminUser = NW.ADMIN_EMAILS && NW.ADMIN_EMAILS.includes(m.email);
-    return `
-    <div class="adm-row" style="align-items:center">
-      <div class="em">${isAdminUser?'👑':'👤'}</div>
-      <div style="flex:1;min-width:0">
-        <b>${m.name || m.email || '익명'}</b>
-        ${isAdminUser?'<span style="color:var(--y);font-size:11px;font-weight:700;margin-left:6px">관리자</span>':''}
-        <div class="muted" style="font-size:12px;font-family:var(--mono);margin-top:2px">${m.email||'-'}</div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div class="muted" style="font-size:11px">가입일</div>
-        <div style="font-size:12px;font-weight:700;font-family:var(--mono)">${dateStr}</div>
-      </div>
-    </div>`;
-  }).join('');
+
+  // 필터 탭
+  const filter = window._memberFilter || 'all';
+
+  const filtered = list.filter(m=>{
+    if(filter==='partner') return m._isPartner;
+    if(filter==='user') return !m._isPartner && !NW.ADMIN_EMAILS?.includes(m.email);
+    if(filter==='admin') return NW.ADMIN_EMAILS?.includes(m.email);
+    return true;
+  });
+
+  $('memberList').innerHTML = `
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+      ${['all','user','partner','admin'].map(f=>`
+        <button onclick="setMemberFilter('${f}')" style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;border:1.5px solid ${filter===f?'var(--y)':'var(--bd)'};background:${filter===f?'var(--y)':'transparent'};color:${filter===f?'#000':'var(--tx2)'};cursor:pointer">
+          ${{all:'전체',user:'👤 일반',partner:'🏪 파트너',admin:'👑 관리자'}[f]}
+        </button>`).join('')}
+    </div>
+    ${filtered.length ? filtered.map(m=>{
+      const t = m.createdAt?.toDate ? m.createdAt.toDate() : null;
+      const dateStr = t ? `${t.getFullYear()}.${t.getMonth()+1}.${t.getDate()}` : '-';
+      const isAdminUser = NW.ADMIN_EMAILS?.includes(m.email);
+      const isPartner = m._isPartner;
+      const icon = isAdminUser ? '👑' : isPartner ? '🏪' : '👤';
+      const badge = isAdminUser
+        ? `<span style="color:var(--y);font-size:11px;font-weight:700;margin-left:6px">관리자</span>`
+        : isPartner
+        ? `<span style="color:var(--ok);font-size:11px;font-weight:700;margin-left:6px">파트너</span>`
+        : '';
+      const bizInfo = isPartner && m._biz
+        ? `<div style="font-size:11px;color:var(--ok);margin-top:2px">🏪 ${m._biz.name||'-'} · ${m._biz.approved?'승인':'대기'}</div>`
+        : '';
+      return `
+      <div class="adm-row" style="align-items:flex-start;cursor:${isPartner?'pointer':'default'}" onclick="${isPartner?`openBizDetail('${m._biz?.id||''}')`:''}" >
+        <div class="em">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <b>${m.name||m.email||'익명'}</b>${badge}
+          <div class="muted" style="font-size:12px;font-family:var(--mono);margin-top:2px">${m.userId?'@'+m.userId+' · ':''}${m.email||'-'}</div>
+          ${bizInfo}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div class="muted" style="font-size:11px">가입일</div>
+          <div style="font-size:12px;font-weight:700;font-family:var(--mono)">${dateStr}</div>
+        </div>
+      </div>`;
+    }).join('') : '<div class="adm-empty">해당 유형의 회원이 없습니다.</div>'}
+  `;
 }
+
+window.setMemberFilter=(f)=>{
+  window._memberFilter = f;
+  renderMemberList(allMembers);
+};
 
 window.filterMembers=()=>{
   const q = $('memberSearch').value.trim().toLowerCase();
   if(!q){ renderMemberList(allMembers); return; }
   const filtered = allMembers.filter(m =>
-    (m.name||'').toLowerCase().includes(q) || (m.email||'').toLowerCase().includes(q)
+    (m.name||'').toLowerCase().includes(q) ||
+    (m.email||'').toLowerCase().includes(q) ||
+    (m.userId||'').toLowerCase().includes(q) ||
+    (m._biz?.name||'').toLowerCase().includes(q)
   );
   renderMemberList(filtered);
 };
+
+/* ── 매장 상세 팝업 ── */
+window.openBizDetail=async(bizId)=>{
+  if(!bizId) return;
+  const {doc,getDoc} = NW.fb;
+  try{
+    const s = await getDoc(doc(NW.db,'nw_biz',bizId));
+    if(!s.exists()){ toast('매장 정보 없음'); return; }
+    const b = {id:bizId,...s.data()};
+    const cat = NW.CATS?.find(c=>c.k===b.cat)||{e:'🏪',n:b.cat||'-'};
+    const created = b.createdAt?.toDate ? b.createdAt.toDate() : null;
+    const createdStr = created ? `${created.getFullYear()}.${created.getMonth()+1}.${created.getDate()}` : '-';
+
+    // 팝업 생성
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:200;display:flex;align-items:flex-end;justify-content:center';
+    overlay.innerHTML = `
+      <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:28px;max-height:80vh;overflow-y:auto">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="font-size:20px;font-weight:800">${cat.e} ${b.name||'-'}</div>
+          <button onclick="this.closest('[style*=fixed]').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">업종</div><b>${cat.n}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">상태</div>
+            <b style="color:${b.approved?'var(--ok)':'var(--soon)'}">${b.approved?'✅ 승인':'⏳ 대기'}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">영업</div>
+            <b>${b.status==='open'?'🟢 영업중':b.status==='busy'?'🟡 혼잡':'🔴 마감'}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">핫플</div>
+            <b>${b.isHot?'🔥 ON':'–'}</b></div>
+          <div class="statbox" style="margin:0;grid-column:1/-1"><div class="muted" style="font-size:11px">주소</div><b>${b.addr||'-'}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">전화</div><b>${b.phone||'-'}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">영업시간</div><b>${b.hours||'-'}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">수신반경</div><b>${b.radius||1000}m</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">최소인원</div><b>${b.minParty||1}명+</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">평점</div><b>${b.ratingAvg?(+b.ratingAvg).toFixed(1)+' ⭐':'-'} (${b.ratingCount||0}개)</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">등록일</div><b>${createdStr}</b></div>
+          <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">직원</div><b>${(b.memberEmails||[]).length}명</b></div>
+        </div>
+        ${b.photo?`<img src="${b.photo}" style="width:100%;border-radius:12px;margin-top:14px;max-height:200px;object-fit:cover">`:''}
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button onclick="toggleHot('${bizId}',${!b.isHot})" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:${b.isHot?'var(--soonbg)':'var(--okbg)'};color:${b.isHot?'var(--soon)':'var(--ok)'};border:none;cursor:pointer">
+            ${b.isHot?'🔥 핫플 OFF':'🔥 핫플 ON'}
+          </button>
+          <button onclick="toggleApprove('${bizId}',${!b.approved})" style="flex:1;padding:12px;border-radius:10px;font-size:13px;font-weight:700;background:${b.approved?'var(--nobg)':'var(--okbg)'};color:${b.approved?'var(--no)':'var(--ok)'};border:none;cursor:pointer">
+            ${b.approved?'❌ 승인 취소':'✅ 승인'}
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', e=>{ if(e.target===overlay) overlay.remove(); });
+  }catch(e){ toast('실패: '+e.message); }
+};
+
+async function toggleHot(bizId, isHot){
+  const {doc,updateDoc} = NW.fb;
+  try{
+    await updateDoc(doc(NW.db,'nw_biz',bizId),{isHot});
+    toast(isHot?'🔥 핫플 ON':'핫플 OFF');
+    document.querySelector('[style*=fixed]')?.remove();
+    loadMemberList();
+  }catch(e){ toast('실패: '+e.message); }
+}
+
+async function toggleApprove(bizId, approved){
+  const {doc,updateDoc} = NW.fb;
+  try{
+    await updateDoc(doc(NW.db,'nw_biz',bizId),{approved});
+    toast(approved?'✅ 승인 완료':'승인 취소');
+    document.querySelector('[style*=fixed]')?.remove();
+    loadMemberList();
+  }catch(e){ toast('실패: '+e.message); }
+}
 </script>
 </body>
 </html>
