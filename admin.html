@@ -554,8 +554,13 @@ window.openBizDetail=async(bizId)=>{
           <button onclick="document.getElementById('bizDetailOverlay').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
         </div>
 
-        ${b.photo?`<img src="${b.photo}" style="width:100%;border-radius:12px;margin-bottom:14px;max-height:200px;object-fit:cover">`:''}
-
+        ${(()=>{
+          const photos = b.photos&&b.photos.length ? b.photos : (b.photo ? [b.photo] : []);
+          if(!photos.length) return '';
+          return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px">'
+            + photos.map((p,i)=>`<img src="${p}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px${i===0?';grid-column:span 2;grid-row:span 2;height:160px;aspect-ratio:unset':''}">`).join('')
+            + '</div>';
+        })()}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
           <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">업종</div><b>${cat.n}</b></div>
           <div class="statbox" style="margin:0"><div class="muted" style="font-size:11px">상태</div>
@@ -607,19 +612,19 @@ window.openBizEdit=async(bizId)=>{
         <button onclick="document.getElementById('bizEditOverlay').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
       </div>
 
-      <!-- 사진 업로드 -->
+      <!-- 사진 최대 5장 -->
       <div style="margin-bottom:18px">
-        <div class="muted" style="font-size:12px;font-weight:700;margin-bottom:8px">대표 사진</div>
-        <div id="adminPhotoPreview" style="width:100%;height:160px;border-radius:12px;background:var(--bg3);border:1px dashed var(--bd);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px;color:var(--tx3);font-size:13px;cursor:pointer" onclick="document.getElementById('adminPhotoFile').click()">
-          ${b.photo?`<img src="${b.photo}" style="width:100%;height:100%;object-fit:cover">`:'📷 클릭해서 사진 선택'}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="muted" style="font-size:12px;font-weight:700">사진 <span id="adminPhotoCnt">0</span>/5장</div>
+          <div style="display:flex;gap:6px">
+            <button onclick="document.getElementById('adminPhotoFile').click()" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일 추가</button>
+            <button onclick="adminPhotoByUrl('${bizId}')" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL 추가</button>
+          </div>
         </div>
         <input type="file" id="adminPhotoFile" accept="image/*" class="hide" onchange="handleAdminPhotoUpload(event,'${bizId}')">
-        <div style="display:flex;gap:8px">
-          <button onclick="document.getElementById('adminPhotoFile').click()" style="flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일 업로드</button>
-          <button onclick="adminPhotoByUrl('${bizId}')" style="flex:1;padding:10px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL 입력</button>
-        </div>
+        <div id="adminPhotoGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;min-height:80px"></div>
         <div id="adminPhotoStatus" style="font-size:11px;color:var(--tx3);margin-top:6px"></div>
-        <input type="hidden" id="adminPhotoUrl" value="${b.photo||''}">
+        <input type="hidden" id="adminPhotoUrls" value="${JSON.stringify(b.photos||[]).replace(/"/g,'&quot;')}">
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -661,12 +666,14 @@ window.handleAdminPhotoUpload=async(event, bizId)=>{
   const file = event.target.files[0];
   if(!file) return;
   const statusEl = document.getElementById('adminPhotoStatus');
+  const urls = getAdminPhotos();
+  if(urls.length >= 5){ toast('사진은 최대 5장까지 가능해요'); return; }
   statusEl.textContent='⏳ 업로드 중…'; statusEl.style.color='var(--tx3)';
   try{
     const url = await NW.uploadBizPhoto(file, bizId);
-    document.getElementById('adminPhotoUrl').value = url;
-    const preview = document.getElementById('adminPhotoPreview');
-    preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
+    urls.push(url);
+    setAdminPhotos(urls);
+    renderAdminGallery(urls);
     statusEl.textContent='✅ 업로드 완료'; statusEl.style.color='var(--ok)';
   }catch(e){
     statusEl.textContent='❌ 실패: '+e.message; statusEl.style.color='var(--no)';
@@ -675,16 +682,53 @@ window.handleAdminPhotoUpload=async(event, bizId)=>{
 };
 
 window.adminPhotoByUrl=(bizId)=>{
+  const urls = getAdminPhotos();
+  if(urls.length >= 5){ toast('사진은 최대 5장까지 가능해요'); return; }
   const url = prompt('사진 URL을 입력하세요 (네이버 플레이스, 인스타 등):');
-  if(!url) return;
-  document.getElementById('adminPhotoUrl').value = url;
-  const preview = document.getElementById('adminPhotoPreview');
-  preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:cover">`;
-  document.getElementById('adminPhotoStatus').textContent='✅ URL 설정 완료';
+  if(!url||!url.trim()) return;
+  urls.push(url.trim());
+  setAdminPhotos(urls);
+  renderAdminGallery(urls);
+  document.getElementById('adminPhotoStatus').textContent='✅ URL 추가 완료';
 };
+
+function getAdminPhotos(){
+  try{ return JSON.parse(document.getElementById('adminPhotoUrls').value.replace(/&quot;/g,'"'))||[]; }
+  catch(e){ return []; }
+}
+function setAdminPhotos(urls){
+  document.getElementById('adminPhotoUrls').value = JSON.stringify(urls).replace(/"/g,'&quot;');
+  document.getElementById('adminPhotoCnt').textContent = urls.length;
+}
+function renderAdminGallery(urls){
+  const el = document.getElementById('adminPhotoGallery');
+  if(!urls.length){
+    el.innerHTML=`<div style="grid-column:1/-1;height:80px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">사진을 추가해주세요 (최대 5장)</div>`;
+    return;
+  }
+  el.innerHTML = urls.map((u,i)=>`
+    <div style="position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1">
+      <img src="${u}" style="width:100%;height:100%;object-fit:cover">
+      ${i===0?'<div style="position:absolute;top:4px;left:4px;background:var(--y);color:#000;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">대표</div>':''}
+      <button onclick="removeAdminPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`).join('');
+}
+window.removeAdminPhoto=(idx)=>{
+  const urls = getAdminPhotos();
+  urls.splice(idx,1);
+  setAdminPhotos(urls);
+  renderAdminGallery(urls);
+};
+
+// 갤러리 초기 렌더
+setTimeout(()=>{
+  const el = document.getElementById('adminPhotoGallery');
+  if(el){ const urls=getAdminPhotos(); renderAdminGallery(urls); document.getElementById('adminPhotoCnt').textContent=urls.length; }
+},100);
 
 window.saveBizEdit=async(bizId)=>{
   const {doc,updateDoc} = NW.fb;
+  const photos = getAdminPhotos();
   const data = {
     name: document.getElementById('beN').value.trim(),
     cat: document.getElementById('beCat').value,
@@ -695,7 +739,8 @@ window.saveBizEdit=async(bizId)=>{
     desc: document.getElementById('beDesc').value.trim(),
     radius: parseInt(document.getElementById('beRad').value),
     minParty: parseInt(document.getElementById('beMin').value),
-    photo: document.getElementById('adminPhotoUrl').value,
+    photos: photos,
+    photo: photos[0]||'', // 하위 호환 — 첫 번째 사진을 대표 사진으로
   };
   if(!data.name){ toast('매장명을 입력해주세요'); return; }
   try{
