@@ -1,5 +1,5 @@
-/* OHdiga Service Worker v1.0 */
-const CACHE = 'ohdiga-v1';
+/* OHdiga Service Worker v1.1 */
+const CACHE = 'ohdiga-v2';
 const STATIC = ['/', '/index.html', '/user.html', '/merchant.html', '/nw.css', '/nw-core.js', '/manifest.json'];
 
 self.addEventListener('install', e=>{
