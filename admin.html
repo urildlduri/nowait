@@ -297,7 +297,7 @@ function renderBizFiltered(cat){
       <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[데모]</span>':''}${b.hasEvent?'<span style="background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px">🎉 이벤트</span>':''}</b>
       <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.merchantId?`<span style="font-family:var(--mono);color:var(--y)">${b.merchantId}</span> · `:''}${b.ownerName||b.ownerEmail||'데모'} ${rating?'· '+rating:''}</small></div>
       <span class="st ${st[1]}">${st[0]}</span>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      <div class="adm-row-btns">
         ${hotBtn}
         <button class="adm-btn" style="padding:6px 10px;color:var(--y);border-color:var(--y)" onclick="event.stopPropagation();openBizEdit('${b.id}')">✏️ 편집</button>
         <button class="adm-btn danger" style="padding:6px 10px" onclick="event.stopPropagation();reject('${b.id}','${(b.name||'').replace(/'/g,'')}')">삭제</button>
