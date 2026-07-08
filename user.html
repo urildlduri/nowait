@@ -40,7 +40,11 @@
   <div id="u-home" class="scr on">
     <div class="page" style="padding:0 0 24px">
 
-      <!-- 공지 슬라이드 배너 — FAST MATCH 카드 위 -->
+      <!-- 공지 배너 (카테고리 위) -->
+      <div id="noticeBanner" class="hide" style="background:var(--bg2);border-bottom:1px solid var(--bd);height:48px;overflow:hidden">
+        <div id="noticeSlides" style="display:flex;flex-direction:column;transition:transform .5s cubic-bezier(.4,0,.2,1)"></div>
+        <div id="noticeDots"></div>
+      </div>
 
       <!-- 상단 카테고리 슬라이드 -->
       <div style="background:var(--bg2);padding:18px 0;border-bottom:1px solid var(--bd)">
@@ -50,11 +54,7 @@
       <!-- FAST MATCH 카드 -->
       <div style="padding:20px 20px 8px">
 
-        <!-- 공지 배너 (히어로 위) -->
-        <div id="noticeBanner" class="hide" style="margin-bottom:14px;border-radius:var(--rad);overflow:hidden;background:var(--bg2);border:1px solid var(--bd)">
-          <div id="noticeSlides" style="display:flex;transition:transform .4s ease;will-change:transform"></div>
-          <div id="noticeDots" style="display:flex;justify-content:center;gap:5px;padding:6px 0 8px"></div>
-        </div>
+        
         <div style="background:var(--y);border-radius:var(--radL);padding:20px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden">
           <div style="position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)"></div>
           <div style="position:absolute;right:16px;bottom:-12px;font-size:60px;opacity:.18">⚡</div>
@@ -1795,20 +1795,23 @@ function renderNoticeBanner(notices){
   const dots = $('noticeDots');
   banner.classList.remove('hide');
 
+  // 세로 슬라이드 스타일로 변경
+  slides.style.cssText = 'display:flex;flex-direction:column;transition:transform .5s cubic-bezier(.4,0,.2,1);will-change:transform';
+
   slides.innerHTML = notices.map((n,i)=>`
-    <div style="min-width:100%;padding:16px 20px 8px;box-sizing:border-box">
-      ${n.image?`<img src="${n.image}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin-bottom:10px">`:''}
-      ${n.title?`<div style="font-size:14px;font-weight:800;color:var(--tx);margin-bottom:4px">${n.title}</div>`:''}
-      ${n.body?`<div style="font-size:13px;color:var(--tx2);line-height:1.5">${n.body}</div>`:''}
-      ${n.link?`<a href="${n.link}" target="_blank" style="display:inline-block;margin-top:8px;font-size:12px;color:var(--y);font-weight:700">자세히 보기 →</a>`:''}
+    <div style="min-width:100%;padding:12px 16px;box-sizing:border-box;display:flex;align-items:center;gap:12px;min-height:48px">
+      ${n.image?`<img src="${n.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0">`:'<div style="width:6px;height:6px;border-radius:50%;background:var(--y);flex-shrink:0"></div>'}
+      <div style="flex:1;min-width:0">
+        ${n.title?`<div style="font-size:13px;font-weight:800;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.title}</div>`:''}
+        ${n.body?`<div style="font-size:12px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${n.body}</div>`:''}
+      </div>
+      ${n.link?`<a href="${n.link}" target="_blank" style="font-size:11px;color:var(--y);font-weight:700;flex-shrink:0">보기 ›</a>`:''}
     </div>`).join('');
 
+  dots.innerHTML = '';
+
   if(notices.length > 1){
-    dots.innerHTML = notices.map((_,i)=>`
-      <div onclick="goNotice(${i})" style="width:${i===0?'18':'6'}px;height:6px;border-radius:3px;background:${i===0?'var(--y)':'var(--bd)'};cursor:pointer;transition:.2s" id="ndot-${i}"></div>`).join('');
     startNoticeTimer(notices.length);
-  }else{
-    dots.innerHTML='';
   }
 }
 
@@ -1816,17 +1819,13 @@ function goNotice(idx){
   const slides = $('noticeSlides');
   const total = slides.children.length;
   noticeCur = (idx+total)%total;
-  slides.style.transform = `translateX(-${noticeCur*100}%)`;
-  // 도트 업데이트
-  for(let i=0;i<total;i++){
-    const d = $(`ndot-${i}`);
-    if(d){ d.style.width=i===noticeCur?'18px':'6px'; d.style.background=i===noticeCur?'var(--y)':'var(--bd)'; }
-  }
+  const itemH = slides.children[0]?.offsetHeight || 48;
+  slides.style.transform = `translateY(-${noticeCur * itemH}px)`;
 }
 
 function startNoticeTimer(total){
   if(noticeTimer) clearInterval(noticeTimer);
-  noticeTimer = setInterval(()=>goNotice(noticeCur+1), 4000);
+  noticeTimer = setInterval(()=>goNotice(noticeCur+1), 3000);
 }
 
 /* ── 개인정보 관리 (D: 다운로드, B: 탈퇴/삭제) ── */
