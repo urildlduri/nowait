@@ -291,9 +291,23 @@
   <!-- 주변 핫플 -->
   <div id="u-hot" class="scr">
     <div class="page">
-      <div class="h1">🔥 이 주변 핫플</div>
-      <div class="muted" style="margin-top:8px">관리자가 추천하는 동네 핫플 모음 <span id="hotMore" style="font-weight:700;color:var(--y)"></span></div>
-      <div id="hotList" style="margin-top:18px"><div class="muted" style="font-size:13px">주변 핫플을 불러오는 중…</div></div>
+      <div class="h1">🔥 핫플</div>
+      <!-- 동네별 필터 -->
+      <div style="display:flex;gap:8px;overflow-x:auto;padding:12px 0;scrollbar-width:none;margin-bottom:4px">
+        <button class="chip on" id="hf-all" onclick="setHotFilter('all')">전체</button>
+        <button class="chip" id="hf-강남" onclick="setHotFilter('강남')">강남</button>
+        <button class="chip" id="hf-역삼" onclick="setHotFilter('역삼')">역삼</button>
+        <button class="chip" id="hf-선릉" onclick="setHotFilter('선릉')">선릉</button>
+        <button class="chip" id="hf-건대" onclick="setHotFilter('건대')">건대</button>
+        <button class="chip" id="hf-홍대" onclick="setHotFilter('홍대')">홍대</button>
+        <button class="chip" id="hf-이태원" onclick="setHotFilter('이태원')">이태원</button>
+        <button class="chip" id="hf-신촌" onclick="setHotFilter('신촌')">신촌</button>
+        <button class="chip" id="hf-압구정" onclick="setHotFilter('압구정')">압구정</button>
+        <button class="chip" id="hf-청담" onclick="setHotFilter('청담')">청담</button>
+        <button class="chip" id="hf-잠실" onclick="setHotFilter('잠실')">잠실</button>
+      </div>
+      <div class="muted" style="margin-bottom:14px"><span id="hotMore"></span></div>
+      <div id="hotList"><div class="muted" style="font-size:13px">핫플을 불러오는 중…</div></div>
     </div>
   </div>
 
@@ -512,59 +526,37 @@ async function restoreCallState(c){
   }
 }
 
-/* ── 이 주변 핫플 (승인된 매장 중 isHot=true, 3km 이내) ── */
-const HOT_RADIUS = 3000; // 3km
+/* ── 핫플 (승인된 매장 중 isHot=true, 동네별 필터) ── */
 let hotLoaded=false;
 async function loadHotplaces(force){
   if(hotLoaded && !force) return;
   if(!NW.fbLoaded) await NW.fbReady;
   if(!NW.db) return;
   hotLoaded=true;
-  // 위치 없으면 안내
-  if(!myLoc){
-    $('hotList').innerHTML=`<div class="penalty" style="border-color:var(--info);background:var(--infobg)"><div class="pi">📍</div><div><b style="color:var(--info)">위치 정보가 필요해요</b><div class="pt" style="color:var(--info);font-family:inherit;font-weight:600">홈에서 위치를 설정한 뒤 다시 와주세요</div></div></div>`;
-    $('hotMore').textContent='';
-    return;
-  }
   try{
     const {collection,getDocs,query,where}=NW.fb;
     const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('isHot','==',true)));
     let list=snap.docs.map(d=>({id:d.id,...d.data()}));
     // 3km 이내만 필터 + 거리순
     list=list.filter(h=>h.lat&&h.lng).map(h=>{
-      h._dist=haversine(myLoc,{lat:h.lat,lng:h.lng});return h;
-    }).filter(h=>h._dist<=HOT_RADIUS).sort((a,b)=>a._dist-b._dist);
+      h._dist = myLoc ? haversine(myLoc,{lat:h.lat,lng:h.lng}) : null; return h;
+    }).sort((a,b)=>(a._dist||0)-(b._dist||0));
     renderHot(list);
   }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">핫플을 불러오지 못했어요.</div>'; }
 }
-function renderHot(list){
-  // 핫플 탭
-  if(!list.length){
-    $('hotList').innerHTML='<div class="muted" style="font-size:13px">3km 이내에 등록된 핫플이 없어요.</div>';
-    $('hotMore').textContent='';
-    $('homeHotList').innerHTML='<div class="muted" style="font-size:13px;padding-bottom:8px">아직 등록된 핫플이 없어요.</div>';
-    $('homeHotSub').textContent='주변 3km 이내';
-    return;
-  }
-  $('hotMore').textContent=`${list.length}곳 · 3km 이내`;
-  $('hotList').innerHTML=list.map(h=>{
-    const cat=catOf(h.cat);
-    const dist=h._dist!=null?distLabel(h._dist):'';
-    const rating=h.ratingAvg?`<span style="color:var(--y)">⭐ ${(+h.ratingAvg).toFixed(1)}</span>`:'';
-    const img=h.photo
-      ? `<img src="${h.photo}" style="width:72px;height:72px;border-radius:10px;object-fit:cover;flex-shrink:0">`
-      : `<div class="em" style="width:72px;height:72px;font-size:32px">${cat.e}</div>`;
-    return `<div class="bizcard" style="align-items:flex-start;cursor:pointer" onclick="openHotDetail('${h.id}')">
-      ${img}
-      <div class="info"><b>${h.name||'매장'}</b>
-        <div class="meta" style="white-space:normal;font-family:inherit;color:var(--tx2);margin-top:4px">${cat.n}${h.hours?' · '+h.hours:''}</div>
-        <div style="margin-top:6px;display:flex;gap:8px;align-items:center;font-size:12px">${rating}${dist?`<span class="meta">${dist}</span>`:''}</div>
-      </div></div>`;
-  }).join('');
+let _hotAll=[], _hotFilter='all';
+window.setHotFilter=(area)=>{
+  _hotFilter=area;
+  document.querySelectorAll('[id^="hf-"]').forEach(b=>b.classList.toggle('on', b.id==='hf-'+area));
+  const list = area==='all' ? _hotAll : _hotAll.filter(h=>(h.addr||h.name||'').includes(area));
+  renderHotList(list);
+};
 
-  // 홈 미리보기 — 상위 5개, 큰 가로 카드
+function renderHot(list){
+  _hotAll = list;
+  // 홈 미리보기 — 상위 5개
   const colors=['#DBEAFE','#E0E7FF','#FEF3C7','#FCE7F3','#D1FAE5','#FED7AA','#CFFAFE','#F3E8FF','#FFE4E6'];
-  $('homeHotSub').textContent=`주변 3km · ${list.length}곳`;
+  $('homeHotSub').textContent=`${list.length}곳`;
   $('homeHotList').innerHTML=list.slice(0,5).map((h,i)=>{
     const cat=catOf(h.cat);
     const dist=h._dist!=null?distLabel(h._dist):'';
@@ -577,11 +569,40 @@ function renderHot(list){
       <div style="position:relative;margin-bottom:8px">
         ${photo}
         <div style="position:absolute;top:8px;left:8px;background:var(--y);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🔥 HOT</div>
+        ${h.hasEvent?`<div style="position:absolute;top:8px;right:8px;background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🎉 이벤트</div>`:''}
       </div>
       <div style="font-size:13px;font-weight:700;margin-bottom:2px">${h.name||'매장'}</div>
       <div style="font-size:11px;color:var(--tx3)">${cat.n}${dist?' · '+dist:''}</div>
       <div style="display:flex;gap:6px;margin-top:4px;font-size:11px">${rating}</div>
     </div>`;
+  }).join('');
+
+  renderHotList(_hotFilter==='all' ? list : list.filter(h=>(h.addr||h.name||'').includes(_hotFilter)));
+}
+
+function renderHotList(list){
+  if(!list.length){
+    $('hotList').innerHTML='<div class="muted" style="font-size:13px">해당 동네에 등록된 핫플이 없어요.</div>';
+    $('hotMore').textContent='';
+    return;
+  }
+  $('hotMore').textContent=`${list.length}곳`;
+  $('hotList').innerHTML=list.map(h=>{
+    const cat=catOf(h.cat);
+    const dist=h._dist!=null?distLabel(h._dist):'';
+    const rating=h.ratingAvg?`<span style="color:var(--y)">⭐ ${(+h.ratingAvg).toFixed(1)}</span>`:'';
+    const img=h.photo
+      ? `<img src="${h.photo}" style="width:72px;height:72px;border-radius:10px;object-fit:cover;flex-shrink:0">`
+      : `<div class="em" style="width:72px;height:72px;font-size:32px">${cat.e}</div>`;
+    return `<div class="bizcard" style="align-items:flex-start;cursor:pointer" onclick="openHotDetail('${h.id}')">
+      <div style="position:relative;flex-shrink:0">
+        ${img}
+        ${h.hasEvent?`<div style="position:absolute;top:-4px;right:-4px;background:#8B5CF6;color:#fff;font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px">🎉</div>`:''}
+      </div>
+      <div class="info"><b>${h.name||'매장'}</b>
+        <div class="meta" style="white-space:normal;font-family:inherit;color:var(--tx2);margin-top:4px">${cat.n}${h.hours?' · '+h.hours:''}</div>
+        <div style="margin-top:6px;display:flex;gap:8px;align-items:center;font-size:12px">${rating}${dist?`<span class="meta">${dist}</span>`:''}</div>
+      </div></div>`;
   }).join('');
 }
 
@@ -1116,18 +1137,19 @@ window.openDetail=async(respId)=>{
   // 사진 갤러리
   const photos = b.photos&&b.photos.length ? b.photos : (b.photo ? [b.photo] : []);
   if(photos.length){
-    if(photos.length===1){
-      $('d-photo').innerHTML=`<img src="${photos[0]}" style="width:100%;height:200px;object-fit:cover;border-radius:var(--rad)" onerror="this.parentNode.innerHTML='${photoFallback(c)}'">`;
-    }else{
-      $('d-photo').innerHTML=`
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;border-radius:var(--rad);overflow:hidden">
-          ${photos.map((p,i)=>`
-            <div style="aspect-ratio:1;overflow:hidden;position:relative">
-              <img src="${p}" style="width:100%;height:100%;object-fit:cover">
-              ${i===8&&photos.length>9?`<div style="position:absolute;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:800">+${photos.length-9}</div>`:''}
-            </div>`).join('')}
-        </div>`;
-    }
+    $('d-photo').innerHTML=`
+      <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
+        <div id="photoSlider" style="display:flex;transition:transform .35s ease;will-change:transform">
+          ${photos.map(p=>`<div style="min-width:100%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+        </div>
+        ${photos.length>1?`
+        <button onclick="slidePhoto(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">‹</button>
+        <button onclick="slidePhoto(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">›</button>
+        <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
+          ${photos.map((_,i)=>`<div class="pdot" data-i="${i}" style="width:${i===0?'16':'6'}px;height:6px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.5)'};transition:.2s"></div>`).join('')}
+        </div>`:''}
+      </div>`;
+    window._photoCur=0; window._photoTotal=photos.length;
   }else{
     $('d-photo').innerHTML = photoFallback(c);
   }
@@ -1145,6 +1167,17 @@ window.openDetail=async(respId)=>{
   drawMap(b);
 };
 function photoFallback(c){return `<div style="width:100%;height:170px;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:64px">${c.e}</div>`;}
+window.slidePhoto=(dir)=>{
+  const total = window._photoTotal||1;
+  window._photoCur = ((window._photoCur||0)+dir+total)%total;
+  const slider = document.getElementById('photoSlider');
+  if(slider) slider.style.transform=`translateX(-${window._photoCur*100}%)`;
+  document.querySelectorAll('.pdot').forEach((d,i)=>{
+    d.style.width = i===window._photoCur?'16px':'6px';
+    d.style.background = i===window._photoCur?'#fff':'rgba(255,255,255,0.5)';
+  });
+};
+
 function renderMenu(b){
   const photos = b.menuPhotos;
   if(!photos||!photos.length){$('d-menu').innerHTML='';return;}
@@ -1587,12 +1620,10 @@ function renderPMenuGallery(){
 window.removePPhoto=i=>{pPhotoList.splice(i,1);renderPGallery();};
 window.removePMenu=i=>{pMenuPhotoList.splice(i,1);renderPMenuGallery();};
 window.pPhotoByUrl=()=>{
-  if(pPhotoList.length>=10){toast('최대 10장');return;}
   const u=prompt('사진 URL:'); if(!u) return;
   pPhotoList.push(u.trim()); renderPGallery();
 };
 window.pMenuByUrl=()=>{
-  if(pMenuPhotoList.length>=5){toast('최대 5장');return;}
   const u=prompt('메뉴판 사진 URL:'); if(!u) return;
   pMenuPhotoList.push(u.trim()); renderPMenuGallery();
 };

@@ -294,7 +294,7 @@ function renderBizFiltered(cat){
       ${b.photo
         ? `<img src="${b.photo}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0">`
         : `<div class="em">${cat.e}</div>`}
-      <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[데모]</span>':''}</b>
+      <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[데모]</span>':''}${b.hasEvent?'<span style="background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px">🎉 이벤트</span>':''}</b>
       <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.ownerName||b.ownerEmail||'데모'} ${rating?'· '+rating:''}</small></div>
       <span class="st ${st[1]}">${st[0]}</span>
       <div style="display:flex;gap:6px;flex-shrink:0">
@@ -765,10 +765,10 @@ window.openBizEdit=async(bizId)=>{
         <button onclick="document.getElementById('bizEditOverlay').remove()" style="background:var(--bg3);border:none;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer">✕</button>
       </div>
 
-      <!-- 사진 최대 10장 (파일 10장 + URL 10장) -->
+      <!-- 사진 (관리자 무제한) -->
       <div style="margin-bottom:18px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <div class="muted" style="font-size:12px;font-weight:700">사진 <span id="adminPhotoCnt">0</span>/10장</div>
+          <div class="muted" style="font-size:12px;font-weight:700">사진 <span id="adminPhotoCnt">0</span>장</div>
           <div style="display:flex;gap:6px">
             <button onclick="document.getElementById('adminPhotoFile').click()" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일 추가</button>
             <button onclick="adminPhotoByUrl('${bizId}')" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL 추가</button>
@@ -799,7 +799,7 @@ window.openBizEdit=async(bizId)=>{
           <textarea class="inp" id="beDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="margin:0;resize:vertical">${b.desc||''}</textarea></div>
         <div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div class="muted" style="font-size:12px;font-weight:700">메뉴판 사진 <span id="adminMenuCnt">0</span>/5장</div>
+            <div class="muted" style="font-size:12px;font-weight:700">메뉴판 사진 <span id="adminMenuCnt">0</span>장</div>
             <div style="display:flex;gap:6px">
               <button onclick="document.getElementById('adminMenuFile').click()" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--y);border:1px solid var(--y);cursor:pointer">📷 파일 추가</button>
               <button onclick="adminMenuByUrl()" style="padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);cursor:pointer">🔗 URL 추가</button>
@@ -823,9 +823,24 @@ window.openBizEdit=async(bizId)=>{
       </div>
 
       <button onclick="saveBizEdit('${bizId}')" style="width:100%;padding:15px;background:var(--y);color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;margin-top:20px;cursor:pointer">저장하기</button>
-      <button onclick="document.getElementById('bizEditOverlay').remove()" style="width:100%;padding:12px;background:var(--bg3);color:var(--tx2);border:none;border-radius:12px;font-size:14px;font-weight:700;margin-top:8px;cursor:pointer">취소</button>
+
+      <!-- 이벤트 등록 -->
+      <div style="margin-top:24px;border-top:1px solid var(--bd);padding-top:20px">
+        <div style="font-size:15px;font-weight:800;margin-bottom:12px">🎉 이벤트 등록</div>
+        <input class="inp" id="beEvTitle" placeholder="이벤트 제목 (예: 오늘 방문시 음료 1잔 무료!)" style="margin-bottom:8px">
+        <textarea class="inp" id="beEvBody" rows="2" placeholder="이벤트 내용" style="margin-bottom:8px;resize:vertical"></textarea>
+        <input class="inp" id="beEvImage" placeholder="이벤트 이미지 URL (선택)" style="margin-bottom:8px">
+        <input class="inp" id="beEvLink" placeholder="링크 URL (선택)" style="margin-bottom:8px">
+        <input class="inp" id="beEvExpiry" type="date" style="margin-bottom:12px">
+        <button onclick="saveEvent('${bizId}')" style="width:100%;padding:12px;background:#8B5CF6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">🎉 이벤트 등록</button>
+        <div id="beEvList" style="margin-top:12px"></div>
+      </div>
+
+      <button onclick="document.getElementById('bizEditOverlay').remove()" style="width:100%;padding:12px;background:var(--bg3);color:var(--tx2);border:none;border-radius:12px;font-size:14px;font-weight:700;margin-top:8px;cursor:pointer">닫기</button>
     </div>`;
   document.body.appendChild(overlay);
+  // 기존 이벤트 로드
+  setTimeout(()=>loadBizEvents(bizId), 200);
 };
 
 window.handleAdminPhotoUpload=async(event, bizId)=>{
@@ -833,7 +848,7 @@ window.handleAdminPhotoUpload=async(event, bizId)=>{
   if(!file) return;
   const statusEl = document.getElementById('adminPhotoStatus');
   const urls = getAdminPhotos();
-  if(urls.length >= 10){ toast('사진은 최대 10장까지 가능해요'); return; }
+  
   statusEl.textContent='⏳ 업로드 중…'; statusEl.style.color='var(--tx3)';
   try{
     const url = await NW.uploadBizPhoto(file, bizId);
@@ -849,7 +864,6 @@ window.handleAdminPhotoUpload=async(event, bizId)=>{
 
 window.adminPhotoByUrl=(bizId)=>{
   const urls = getAdminPhotos();
-  if(urls.length >= 10){ toast('사진은 최대 10장까지 가능해요'); return; }
   const url = prompt('사진 URL을 입력하세요 (네이버 플레이스, 인스타 등):');
   if(!url||!url.trim()) return;
   urls.push(url.trim());
@@ -869,7 +883,7 @@ function setAdminPhotos(urls){
 function renderAdminGallery(urls){
   const el = document.getElementById('adminPhotoGallery');
   if(!urls.length){
-    el.innerHTML=`<div style="grid-column:1/-1;height:80px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">사진을 추가해주세요 (최대 10장)</div>`;
+    el.innerHTML=`<div style="grid-column:1/-1;height:80px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">사진을 추가해주세요</div>`;
     return;
   }
   el.innerHTML = urls.map((u,i)=>`
@@ -906,7 +920,7 @@ function renderAdminMenuGallery(urls){
   const el = document.getElementById('adminMenuGallery');
   if(!el) return;
   if(!urls.length){
-    el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">메뉴판 사진을 추가해주세요 (최대 5장)</div>`;
+    el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">메뉴판 사진을 추가해주세요</div>`;
     return;
   }
   el.innerHTML = urls.map((u,i)=>`
@@ -919,7 +933,7 @@ window.handleAdminMenuUpload=async(event, bizId)=>{
   const file = event.target.files[0];
   if(!file) return;
   const urls = getAdminMenuPhotos();
-  if(urls.length >= 5){ toast('메뉴판 사진은 최대 5장까지 가능해요'); return; }
+  
   const statusEl = document.getElementById('adminMenuStatus');
   statusEl.textContent='⏳ 업로드 중…'; statusEl.style.color='var(--tx3)';
   try{
@@ -940,7 +954,6 @@ window.handleAdminMenuUpload=async(event, bizId)=>{
 };
 window.adminMenuByUrl=()=>{
   const urls = getAdminMenuPhotos();
-  if(urls.length >= 5){ toast('메뉴판 사진은 최대 5장까지 가능해요'); return; }
   const url = prompt('메뉴판 사진 URL을 입력하세요:');
   if(!url||!url.trim()) return;
   urls.push(url.trim());
@@ -954,7 +967,66 @@ window.removeAdminMenuPhoto=(idx)=>{
   renderAdminMenuGallery(urls);
 };
 
-window.saveBizEdit=async(bizId)=>{
+window.saveEvent=async(bizId)=>{
+  const title = document.getElementById('beEvTitle')?.value.trim();
+  const body = document.getElementById('beEvBody')?.value.trim();
+  const image = document.getElementById('beEvImage')?.value.trim();
+  const link = document.getElementById('beEvLink')?.value.trim();
+  const expiry = document.getElementById('beEvExpiry')?.value;
+  if(!title){ toast('이벤트 제목을 입력해주세요'); return; }
+  const {collection,addDoc,serverTimestamp,doc,updateDoc} = NW.fb;
+  try{
+    // nw_notices에 type:'event' + bizId로 저장
+    await addDoc(collection(NW.db,'nw_notices'),{
+      title, body:body||'', image:image||'', link:link||'',
+      type:'event', bizId, active:true, order:0,
+      expiresAt: expiry || null,
+      createdAt:serverTimestamp()
+    });
+    // 매장에 hasEvent 플래그 설정
+    await updateDoc(doc(NW.db,'nw_biz',bizId),{hasEvent:true});
+    toast('🎉 이벤트 등록 완료');
+    document.getElementById('beEvTitle').value='';
+    document.getElementById('beEvBody').value='';
+    document.getElementById('beEvImage').value='';
+    document.getElementById('beEvLink').value='';
+    document.getElementById('beEvExpiry').value='';
+    loadBizEvents(bizId);
+  }catch(e){ toast('실패: '+e.message); }
+};
+
+async function loadBizEvents(bizId){
+  const el = document.getElementById('beEvList');
+  if(!el) return;
+  const {collection,query,where,getDocs,doc,updateDoc} = NW.fb;
+  try{
+    const snap = await getDocs(query(collection(NW.db,'nw_notices'), where('bizId','==',bizId), where('type','==','event')));
+    const list = snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(!list.length){ el.innerHTML='<div class="muted" style="font-size:12px;margin-top:8px">등록된 이벤트 없음</div>'; return; }
+    el.innerHTML = list.map(e=>`
+      <div style="background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:13px;font-weight:700">${e.title}</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">${e.active?'✅ 활성':'❌ 비활성'} ${e.expiresAt?'· ~'+e.expiresAt:''}</div>
+        </div>
+        <button onclick="toggleEvent('${e.id}',${!e.active},'${bizId}')" style="padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;background:${e.active?'var(--nobg)':'var(--okbg)'};color:${e.active?'var(--no)':'var(--ok)'};border:none;cursor:pointer">${e.active?'비활성화':'활성화'}</button>
+      </div>`).join('');
+  }catch(e){ el.innerHTML=''; }
+}
+
+window.toggleEvent=async(evId, active, bizId)=>{
+  const {doc,updateDoc,collection,query,where,getDocs} = NW.fb;
+  await updateDoc(doc(NW.db,'nw_notices',evId),{active});
+  // 활성 이벤트 없으면 hasEvent 해제
+  if(!active){
+    const snap = await getDocs(query(collection(NW.db,'nw_notices'), where('bizId','==',bizId), where('type','==','event'), where('active','==',true)));
+    if(snap.empty) await updateDoc(doc(NW.db,'nw_biz',bizId),{hasEvent:false});
+  }else{
+    await updateDoc(doc(NW.db,'nw_biz',bizId),{hasEvent:true});
+  }
+  loadBizEvents(bizId);
+  toast(active?'✅ 이벤트 활성화':'이벤트 비활성화');
+};
   const {doc,updateDoc} = NW.fb;
   const photos = getAdminPhotos();
   const menuPhotos = getAdminMenuPhotos();
