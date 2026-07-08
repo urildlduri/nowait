@@ -526,7 +526,8 @@ async function restoreCallState(c){
   }
 }
 
-/* ── 핫플 (승인된 매장 중 isHot=true, 동네별 필터) ── */
+/* ── 핫플 로드 ── */
+const HOT_RADIUS = 3000; // 홈 메인용 3km
 let hotLoaded=false;
 async function loadHotplaces(force){
   if(hotLoaded && !force) return;
@@ -536,12 +537,19 @@ async function loadHotplaces(force){
   try{
     const {collection,getDocs,query,where}=NW.fb;
     const snap=await getDocs(query(collection(NW.db,'nw_biz'),where('isHot','==',true)));
-    let list=snap.docs.map(d=>({id:d.id,...d.data()}));
-    // 3km 이내만 필터 + 거리순
-    list=list.filter(h=>h.lat&&h.lng).map(h=>{
+    const all=snap.docs.map(d=>({id:d.id,...d.data()})).filter(h=>h.lat&&h.lng).map(h=>{
       h._dist = myLoc ? haversine(myLoc,{lat:h.lat,lng:h.lng}) : null; return h;
-    }).sort((a,b)=>(a._dist||0)-(b._dist||0));
-    renderHot(list);
+    });
+
+    // 홈 메인 — 위치 기반 3km 이내, 거리순
+    const nearby = myLoc
+      ? all.filter(h=>h._dist!=null && h._dist<=HOT_RADIUS).sort((a,b)=>a._dist-b._dist)
+      : all.slice(0,5);
+    renderHomeHot(nearby);
+
+    // 핫플 탭 — 전체 (지역별 필터용)
+    _hotAll = all.sort((a,b)=>(a._dist||99999)-(b._dist||99999));
+    renderHotList(_hotFilter==='all' ? _hotAll : _hotAll.filter(h=>(h.addr||'').includes(_hotFilter)));
   }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">핫플을 불러오지 못했어요.</div>'; }
 }
 let _hotAll=[], _hotFilter='all';
@@ -552,16 +560,20 @@ window.setHotFilter=(area)=>{
   renderHotList(list);
 };
 
-function renderHot(list){
-  _hotAll = list;
-  // 홈 미리보기 — 상위 5개
+function renderHomeHot(list){
+  // 홈 미리보기 — 위치 기반 근처 핫플
   const colors=['#DBEAFE','#E0E7FF','#FEF3C7','#FCE7F3','#D1FAE5','#FED7AA','#CFFAFE','#F3E8FF','#FFE4E6'];
-  $('homeHotSub').textContent=`${list.length}곳`;
+  if(!list.length){
+    $('homeHotList').innerHTML='<div class="muted" style="font-size:13px;padding-bottom:8px">주변 3km 이내에 핫플이 없어요.</div>';
+    $('homeHotSub').textContent='주변 3km 이내';
+    return;
+  }
+  $('homeHotSub').textContent=`주변 3km · ${list.length}곳`;
   $('homeHotList').innerHTML=list.slice(0,5).map((h,i)=>{
     const cat=catOf(h.cat);
     const dist=h._dist!=null?distLabel(h._dist):'';
-    const bg = colors[i%colors.length];
-    const photo = h.photo
+    const bg=colors[i%colors.length];
+    const photo=h.photo
       ? `<img src="${h.photo}" style="width:100%;height:130px;object-fit:cover;border-radius:12px">`
       : `<div style="width:100%;height:130px;border-radius:12px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:48px">${cat.e}</div>`;
     const rating=h.ratingAvg?`<span style="color:var(--y);font-weight:700">★ ${(+h.ratingAvg).toFixed(1)}</span>`:'';
@@ -569,15 +581,13 @@ function renderHot(list){
       <div style="position:relative;margin-bottom:8px">
         ${photo}
         <div style="position:absolute;top:8px;left:8px;background:var(--y);color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🔥 HOT</div>
-        ${h.hasEvent?`<div style="position:absolute;top:8px;right:8px;background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🎉 이벤트</div>`:''}
+        ${h.hasEvent?`<div style="position:absolute;top:8px;right:8px;background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🎉</div>`:''}
       </div>
       <div style="font-size:13px;font-weight:700;margin-bottom:2px">${h.name||'매장'}</div>
       <div style="font-size:11px;color:var(--tx3)">${cat.n}${dist?' · '+dist:''}</div>
       <div style="display:flex;gap:6px;margin-top:4px;font-size:11px">${rating}</div>
     </div>`;
   }).join('');
-
-  renderHotList(_hotFilter==='all' ? list : list.filter(h=>(h.addr||h.name||'').includes(_hotFilter)));
 }
 
 function renderHotList(list){
