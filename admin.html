@@ -134,10 +134,7 @@
     </div>
     <div class="adm-panel">
       <h3>승인 매장 <span class="cnt" id="bizCnt">0곳</span></h3>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="adm-btn on" id="bcat-all" onclick="setBizCatFilter('all')" style="padding:5px 10px;font-size:12px">전체</button>
-        ${NW.CATS.map(c=>`<button class="adm-btn" id="bcat-${c.k}" onclick="setBizCatFilter('${c.k}')" style="padding:5px 10px;font-size:12px">${c.e} ${c.n}</button>`).join('')}
-      </div>
+      <div id="bizCatFilter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
       <div class="adm-list" id="bizList"><div class="adm-empty">승인된 매장이 없습니다.</div></div>
     </div>
   </div>
@@ -259,6 +256,13 @@ function renderBiz(){
         <button class="adm-btn" style="padding:7px 12px;color:var(--ok);border-color:var(--ok)" onclick="approve('${b.id}')">승인</button>
         <button class="adm-btn danger" style="padding:7px 12px" onclick="reject('${b.id}','${(b.name||'').replace(/'/g,'')}')">거절</button>
       </div></div>`;}).join('');
+  // 카테고리 필터 버튼 동적 렌더
+  const filterEl = $('bizCatFilter');
+  if(filterEl && !filterEl.innerHTML){
+    filterEl.innerHTML = `<button class="adm-btn on" id="bcat-all" onclick="setBizCatFilter('all')" style="padding:5px 10px;font-size:12px">전체</button>`
+      + NW.CATS.map(c=>`<button class="adm-btn" id="bcat-${c.k}" onclick="setBizCatFilter('${c.k}')" style="padding:5px 10px;font-size:12px">${c.e} ${c.n}</button>`).join('');
+  }
+
   // 승인 매장
   $('bizCnt').textContent=approved.length+'곳';$('sBiz').textContent=approved.length;
   if(!approved.length){$('bizList').innerHTML='<div class="adm-empty">승인된 매장이 없습니다.</div>';return;}
