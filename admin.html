@@ -134,6 +134,10 @@
     </div>
     <div class="adm-panel">
       <h3>승인 매장 <span class="cnt" id="bizCnt">0곳</span></h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="adm-btn on" id="bcat-all" onclick="setBizCatFilter('all')" style="padding:5px 10px;font-size:12px">전체</button>
+        ${NW.CATS.map(c=>`<button class="adm-btn" id="bcat-${c.k}" onclick="setBizCatFilter('${c.k}')" style="padding:5px 10px;font-size:12px">${c.e} ${c.n}</button>`).join('')}
+      </div>
       <div class="adm-list" id="bizList"><div class="adm-empty">승인된 매장이 없습니다.</div></div>
     </div>
   </div>
@@ -258,7 +262,26 @@ function renderBiz(){
   // 승인 매장
   $('bizCnt').textContent=approved.length+'곳';$('sBiz').textContent=approved.length;
   if(!approved.length){$('bizList').innerHTML='<div class="adm-empty">승인된 매장이 없습니다.</div>';return;}
-  $('bizList').innerHTML=approved.map(b=>{const cat=catOf(b.cat);const st=BST[b.status]||['?','st-closed'];
+  window._approvedBiz = approved;
+  renderBizFiltered(window._bizCatFilter||'all');
+}
+
+let _bizCatFilter = 'all';
+window.setBizCatFilter=(cat)=>{
+  _bizCatFilter = cat;
+  window._bizCatFilter = cat;
+  document.querySelectorAll('[id^="bcat-"]').forEach(b=>{
+    b.classList.toggle('on', b.id === 'bcat-'+cat);
+  });
+  renderBizFiltered(cat);
+};
+
+function renderBizFiltered(cat){
+  const approved = window._approvedBiz || [];
+  const list = cat==='all' ? approved : approved.filter(b=>b.cat===cat);
+  $('bizCnt').textContent = list.length+'곳';
+  if(!list.length){$('bizList').innerHTML=`<div class="adm-empty">${cat==='all'?'승인된 매장이 없습니다.':'해당 카테고리 매장이 없어요.'}</div>`;return;}
+  $('bizList').innerHTML=list.map(b=>{const cat=catOf(b.cat);const st=BST[b.status]||['?','st-closed'];
     const rating=b.ratingAvg?`⭐ ${(+b.ratingAvg).toFixed(1)}(${b.ratingCount||0})`:'';
     const hotBtn=b.isHot
       ? `<button class="adm-btn" style="padding:6px 10px;color:var(--y);border-color:var(--y)" onclick="event.stopPropagation();toggleHot('${b.id}',false)">🔥 핫플 ON</button>`
