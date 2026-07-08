@@ -751,6 +751,7 @@ window.respond=async(callId,type)=>{
   if(!cs.exists()||cs.data().status!=='searching'){toast('이미 마감된 호출이에요.');return;}
   const cd=cs.data();const realDist=haversine(myBiz,{lat:cd.lat,lng:cd.lng});
   await setDoc(doc(NW.db,'nw_calls',callId,'responses',myBizId),{bizId:myBizId,bizName:myBiz.name,cat:myBiz.cat,type,dist:realDist,
+    photo:myBiz.photo||'',
     responderUid:NW.uid, responderName:NW.user?.displayName||'', responderEmail:NW.user?.email||'',
     at:serverTimestamp()});
   respondedCalls.add(callId);
