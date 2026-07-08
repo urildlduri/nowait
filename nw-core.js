@@ -289,13 +289,16 @@ NW.adminCreateMerchant = async function({name, cat, addr, lat, lng}){
   const Au = await import(FB_BASE+"firebase-auth.js");
   const {doc, setDoc, serverTimestamp} = NW.fb;
 
-  // 1) 아이디/비번 생성
-  const rand = Math.floor(1000+Math.random()*9000);
-  const merchantId = `${cat||'biz'}-${rand}`;
-  // 읽기 쉬운 영문소문자+숫자 8자리 (헷갈리는 l,o,0,1 제외)
-  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-  let password = '';
-  for(let i=0;i<8;i++) password += chars[Math.floor(Math.random()*chars.length)];
+  // 1) 카테고리별 아이디 prefix + 번호
+  const CAT_PREFIX = {
+    pub:'sul', karaoke:'ka', escape:'esc', golf:'golf',
+    party:'pa', stay:'stay', massage:'mas', board:'board', pcroom:'pc'
+  };
+  const prefix = CAT_PREFIX[cat] || 'biz';
+  const rand = Math.floor(100+Math.random()*900);
+  const merchantId = `${prefix}-${rand}`;
+  // 비밀번호 고정 1234 (현장 전달 쉽게)
+  const password = '1234';
   const fakeEmail = NW.merchantIdToFakeEmail(merchantId);
 
   // 2) 보조 앱 인스턴스에서 계정 생성 (관리자 세션 영향 없음)
@@ -458,4 +461,3 @@ NW.myBusiness = async function(){
   if(!list.length) return null;
   return list.find(b=>b.approved)||list[0];
 };
-
