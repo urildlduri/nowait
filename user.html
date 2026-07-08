@@ -392,11 +392,10 @@ function subShow(id){
 window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();if(id==='u-hot')loadHotplaces(true);};
 
 function init(){
-  buildChips(); getLoc(); loadNotices();
+  buildChips(); getLoc();
   NW.onAuth(async u=>{
     if(!u){ location.href='index.html'; return; }
     const role=await NW.getRole(u);
-    // 관리자는 슈퍼유저 — 사용자 앱 그대로 열람 가능 (튕기지 않음)
     if(role==='merchant'){ location.replace('merchant.html'); return; }
     NW.mountAccount('acct');
     if(role==='admin'){
@@ -408,7 +407,7 @@ function init(){
     refreshPenalty();
     loadHotplaces();
     loadPoints();
-    // 진행중인 호출 자동 복원 (위치 로딩 대기)
+    loadNotices();
     setTimeout(()=>restoreActiveCall(), 1500);
   });
 }
