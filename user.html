@@ -41,7 +41,7 @@
     <div class="page" style="padding:0 0 24px">
 
       <!-- 공지 배너 (카테고리 위) -->
-      <div id="noticeBanner" class="hide" style="background:var(--bg2);border-bottom:1px solid var(--bd);height:48px;overflow:hidden">
+      <div id="noticeBanner" class="hide" style="background:#0A0A0A;border-bottom:2px solid #1a1a1a;height:44px;overflow:hidden">
         <div id="noticeSlides" style="display:flex;flex-direction:column;transition:transform .5s cubic-bezier(.4,0,.2,1)"></div>
         <div id="noticeDots"></div>
       </div>
@@ -1799,13 +1799,15 @@ function renderNoticeBanner(notices){
   slides.style.cssText = 'display:flex;flex-direction:column;transition:transform .5s cubic-bezier(.4,0,.2,1);will-change:transform';
 
   slides.innerHTML = notices.map((n,i)=>`
-    <div style="min-width:100%;padding:12px 16px;box-sizing:border-box;display:flex;align-items:center;gap:12px;min-height:48px">
-      ${n.image?`<img src="${n.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0">`:'<div style="width:6px;height:6px;border-radius:50%;background:var(--y);flex-shrink:0"></div>'}
-      <div style="flex:1;min-width:0">
-        ${n.title?`<div style="font-size:13px;font-weight:800;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.title}</div>`:''}
-        ${n.body?`<div style="font-size:12px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">${n.body}</div>`:''}
+    <div style="min-width:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:10px;height:44px">
+      <span style="color:#00BFFF;font-size:11px;font-weight:800;font-family:monospace;flex-shrink:0;letter-spacing:1px">📢 NOTICE</span>
+      <div style="width:1px;height:20px;background:#333;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;color:#00BFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:monospace;letter-spacing:0.3px">
+          ${n.title||''}${n.title&&n.body?' — ':''}${n.body||''}
+        </div>
       </div>
-      ${n.link?`<a href="${n.link}" target="_blank" style="font-size:11px;color:var(--y);font-weight:700;flex-shrink:0">보기 ›</a>`:''}
+      ${n.link?`<a href="${n.link}" target="_blank" style="font-size:11px;color:#FFD700;font-weight:700;flex-shrink:0;font-family:monospace">VIEW ›</a>`:''}
     </div>`).join('');
 
   dots.innerHTML = '';
