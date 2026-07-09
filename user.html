@@ -1093,8 +1093,19 @@ async function autoRespondDemo(callId){
 function listenResponses(){
   responses=[];
   const {collection,onSnapshot}=NW.fb;
-  callUnsub=onSnapshot(collection(NW.db,'nw_calls',curCallId,'responses'),snap=>{
-    responses=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.type!=='no');
+  callUnsub=onSnapshot(collection(NW.db,'nw_calls',curCallId,'responses'),async snap=>{
+    const raw=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.type!=='no');
+    // photo 없으면 nw_biz에서 보충
+    for(const r of raw){
+      if(!r.photo && r.id){
+        try{
+          const {doc,getDoc}=NW.fb;
+          const s=await getDoc(doc(NW.db,'nw_biz',r.id));
+          if(s.exists()) r.photo=s.data().photo||'';
+        }catch(e){}
+      }
+    }
+    responses=raw;
     $('srCount').textContent=responses.length; renderResponses();
   });
 }
@@ -1158,9 +1169,14 @@ window.openDetail=async(respId)=>{
   let b={};
   try{const {doc,getDoc}=NW.fb;const s=await getDoc(doc(NW.db,'nw_biz',r.id));if(s.exists())b=s.data();}catch(e){}
   detailBiz=b;
+
+  // 카드 썸네일도 Firestore photo로 업데이트
+  const bizPhoto = b.photo||r.photo||'';
+
   subShow('u-detail');
-  // 사진 갤러리
-  const photos = b.photos&&b.photos.length ? b.photos : (b.photo ? [b.photo] : []);
+
+  // 사진 슬라이드
+  const photos = b.photos&&b.photos.length ? b.photos : (bizPhoto ? [bizPhoto] : []);
   if(photos.length){
     $('d-photo').innerHTML=`
       <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
@@ -1168,8 +1184,8 @@ window.openDetail=async(respId)=>{
           ${photos.map(p=>`<div style="min-width:100%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
         </div>
         ${photos.length>1?`
-        <button onclick="slidePhoto(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">‹</button>
-        <button onclick="slidePhoto(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">›</button>
+        <button onclick="slidePhoto(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
+        <button onclick="slidePhoto(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">›</button>
         <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
           ${photos.map((_,i)=>`<div class="pdot" data-i="${i}" style="width:${i===0?'16':'6'}px;height:6px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.5)'};transition:.2s"></div>`).join('')}
         </div>`:''}
@@ -1235,12 +1251,16 @@ window.openMenuPhoto=(url)=>{
 };
 function renderInfo(b){
   const rows=[];
-  if(b.hours)rows.push(['영업시간',b.hours]);
-  if(b.phone)rows.push(['전화',b.phone]);
-  rows.push(['주차',b.parking?'가능':'불가']);
-  rows.push(['예약',b.reservation?'가능':'불가']);
-  $('d-info').innerHTML=`<div class="h2" style="margin-top:24px">영업정보</div><div class="bizdetail">`+
-    rows.map(r=>`<div class="row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')+`</div>`;
+  if(b.desc) rows.push(['소개',b.desc]);
+  if(b.addr) rows.push(['주소',b.addr]);
+  if(b.hours) rows.push(['영업시간',b.hours]);
+  if(b.phone) rows.push(['전화',`<a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a>`]);
+  if(b.website) rows.push(['홈페이지',`<a href="${b.website}" target="_blank" style="color:var(--y)">바로가기</a>`]);
+  rows.push(['주차',b.parking?'✅ 가능':'❌ 불가']);
+  rows.push(['예약',b.reservation?'✅ 가능':'❌ 불가']);
+  if(!rows.length){ $('d-info').innerHTML=''; return; }
+  $('d-info').innerHTML=`<div class="h2" style="margin-top:24px">📋 매장 정보</div><div class="bizdetail">`+
+    rows.map(r=>`<div class="row"><span style="color:var(--tx3);flex-shrink:0">${r[0]}</span><b style="text-align:right;word-break:break-all">${r[1]}</b></div>`).join('')+`</div>`;
 }
 async function drawMap(b){
   const box=$('d-map');
