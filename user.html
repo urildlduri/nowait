@@ -335,9 +335,8 @@
         <button class="cta" id="hdCallBtn" style="margin-top:10px" onclick="directCall()" disabled>지금 가능 한가요?</button>
       </div>
 
-      <div id="hd-contact"></div>
-      <div id="hd-menu"></div>
       <div id="hd-info"></div>
+      <div id="hd-menu"></div>
       <div class="sec-divider"></div>
       <div class="h2">리뷰</div>
       <div id="hd-myreview"></div>
@@ -632,55 +631,7 @@ function showHotDetail(b){
   curHotBiz=b;
   dcParty=null;
   subShow('u-hotdetail');
-  const cat=catOf(b.cat);
-  // 사진 슬라이드
-  const hdPhotos = b.photos&&b.photos.length ? b.photos : (b.photo ? [b.photo] : []);
-  if(hdPhotos.length){
-    $('hd-photo').innerHTML=`
-      <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
-        <div id="hdPhotoSlider" style="display:flex;transition:transform .35s ease">
-          ${hdPhotos.map(p=>`<div style="min-width:100%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
-        </div>
-        ${hdPhotos.length>1?`
-        <button onclick="slideHdPhoto(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
-        <button onclick="slideHdPhoto(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">›</button>
-        <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
-          ${hdPhotos.map((_,i)=>`<div class="hpdot" style="width:${i===0?'16':'6'}px;height:6px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.5)'}"></div>`).join('')}
-        </div>`:''}
-      </div>`;
-    window._hdPhotoCur=0; window._hdPhotoTotal=hdPhotos.length;
-  }else{
-    $('hd-photo').innerHTML=hotPhotoFallback(cat);
-  }
-  $('hd-name').textContent=b.name||'매장';
-  const dist=myLoc&&b.lat&&b.lng?' · '+distLabel(haversine(myLoc,{lat:b.lat,lng:b.lng})):'';
-  $('hd-meta').textContent=`${cat.e} ${cat.n}${dist}`;
-  // 별점
-  if(b.ratingAvg){
-    $('hd-rating').innerHTML=`<div style="text-align:right"><div style="color:var(--y);font-size:18px;font-weight:800">⭐ ${(+b.ratingAvg).toFixed(1)}</div><div style="color:var(--tx3);font-size:11px">리뷰 ${b.ratingCount||0}개</div></div>`;
-  }else{
-    $('hd-rating').innerHTML=`<div style="color:var(--tx3);font-size:12px">아직 별점 없음</div>`;
-  }
-  // 길찾기
-  if(b.lat&&b.lng)$('hd-route').href=NW.kakaoRoute(b.name,b.lat,b.lng);
-  else $('hd-route').classList.add('hide');
-  // 연락처 / 홈페이지
-  const contact=[];
-  if(b.phone) contact.push(`<div class="row"><span>전화</span><b><a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a></b></div>`);
-  if(b.website) contact.push(`<div class="row"><span>홈페이지</span><b><a href="${b.website}" target="_blank" rel="noopener" style="color:var(--y)">바로가기 →</a></b></div>`);
-  $('hd-contact').innerHTML=contact.length?`<div class="bizdetail" style="margin-top:18px">${contact.join('')}</div>`:'';
-  // 메뉴
-  if(b.menu&&b.menu.length){
-    $('hd-menu').innerHTML=`<div class="h2" style="margin-top:24px">메뉴</div><div class="bizdetail">`+
-      b.menu.map(m=>`<div class="row"><span style="color:var(--tx)">${m.name}</span><b>${m.price?m.price.toLocaleString()+'원':'-'}</b></div>`).join('')+`</div>`;
-  }else $('hd-menu').innerHTML='';
-  // 영업정보
-  const info=[];
-  if(b.hours) info.push(['영업시간',b.hours]);
-  info.push(['주차',b.parking?'가능':'정보없음']);
-  info.push(['예약',b.reservation?'가능':'정보없음']);
-  $('hd-info').innerHTML=`<div class="h2" style="margin-top:24px">영업정보</div><div class="bizdetail">`+
-    info.map(r=>`<div class="row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')+`</div>`;
+  renderBizDetail(b, 'hd');
   // 지도
   drawHotMap(b);
   // 핫플 직접호출 인원 칩
@@ -694,7 +645,94 @@ window.pickDcParty=n=>{
   document.querySelectorAll('#hdPartyChips .chip').forEach(b=>b.classList.toggle('on',+b.dataset.n===n));
   $('hdCallBtn').disabled = !(dcParty && curHotBiz && myLoc && !penalActive());
 };
-function hotPhotoFallback(c){return `<div style="width:100%;height:200px;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:72px">${c.e}</div>`;}
+/* ════════════════════════════════════════════════
+   공통 매장 상세 렌더 함수
+   prefix = 'hd' (핫플) or 'd' (호출상세)
+   ════════════════════════════════════════════════ */
+function renderBizDetail(b, prefix){
+  const cat = catOf(b.cat);
+  const photos = b.photos&&b.photos.length ? b.photos : (b.photo ? [b.photo] : []);
+  const sliderId = prefix+'PhotoSlider';
+  const dotClass = prefix+'pdot';
+
+  // 사진 슬라이드
+  if(photos.length){
+    $(prefix+'-photo').innerHTML=`
+      <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
+        <div id="${sliderId}" style="display:flex;transition:transform .35s ease;will-change:transform">
+          ${photos.map(p=>`<div style="min-width:100%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+        </div>
+        ${photos.length>1?`
+        <button onclick="slideBizPhoto('${prefix}',-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
+        <button onclick="slideBizPhoto('${prefix}',1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">›</button>
+        <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
+          ${photos.map((_,i)=>`<div class="${dotClass}" style="width:${i===0?'16':'6'}px;height:6px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.5)'};transition:.2s"></div>`).join('')}
+        </div>`:''}
+      </div>`;
+    window[`_${prefix}PhotoCur`]=0; window[`_${prefix}PhotoTotal`]=photos.length;
+  }else{
+    $(prefix+'-photo').innerHTML=`<div style="width:100%;aspect-ratio:4/3;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:72px">${cat.e}</div>`;
+  }
+
+  // 이름 / 메타
+  if($(prefix+'-name')) $(prefix+'-name').textContent=b.name||'매장';
+  const dist=myLoc&&b.lat&&b.lng?' · '+distLabel(haversine(myLoc,{lat:b.lat,lng:b.lng})):'';
+  if($(prefix+'-meta')) $(prefix+'-meta').textContent=`${cat.e} ${cat.n}${dist}`;
+
+  // 별점
+  if($(prefix+'-rating')){
+    $(prefix+'-rating').innerHTML = b.ratingAvg
+      ? `<div style="text-align:right"><div style="color:var(--y);font-size:18px;font-weight:800">⭐ ${(+b.ratingAvg).toFixed(1)}</div><div style="color:var(--tx3);font-size:11px">리뷰 ${b.ratingCount||0}개</div></div>`
+      : `<div style="color:var(--tx3);font-size:12px">아직 별점 없음</div>`;
+  }
+
+  // 길찾기
+  if($(prefix+'-route')){
+    if(b.lat&&b.lng){ $(prefix+'-route').href=NW.kakaoRoute(b.name,b.lat,b.lng); $(prefix+'-route').classList.remove('hide'); }
+    else $(prefix+'-route').classList.add('hide');
+  }
+
+  // 영업정보 통합 (소개글+주소+연락처+영업시간+편의)
+  const infoRows=[];
+  if(b.desc) infoRows.push(['소개',`<span style="color:var(--tx2);white-space:pre-wrap">${b.desc}</span>`]);
+  if(b.addr) infoRows.push(['주소',b.addr]);
+  if(b.hours) infoRows.push(['영업시간',b.hours]);
+  if(b.phone) infoRows.push(['전화',`<a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a>`]);
+  if(b.website) infoRows.push(['홈페이지',`<a href="${b.website}" target="_blank" style="color:var(--y)">바로가기 →</a>`]);
+  infoRows.push(['주차',b.parking?'✅ 가능':'❌ 불가']);
+  infoRows.push(['예약',b.reservation?'✅ 가능':'❌ 불가']);
+  const infoEl = $(prefix+'-info');
+  if(infoEl) infoEl.innerHTML=`<div class="h2" style="margin-top:24px">📋 매장 정보</div><div class="bizdetail">`+
+    infoRows.map(r=>`<div class="row"><span style="color:var(--tx3);flex-shrink:0">${r[0]}</span><b style="text-align:right;word-break:break-all">${r[1]}</b></div>`).join('')+`</div>`;
+
+  // 메뉴판 사진
+  const menuEl = $(prefix+'-menu');
+  if(menuEl){
+    const mp = b.menuPhotos;
+    if(mp&&mp.length){
+      menuEl.innerHTML=`<div class="h2" style="margin-top:24px">🍽 메뉴판</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px">
+          ${mp.map(p=>`<div style="border-radius:10px;overflow:hidden;aspect-ratio:3/4;cursor:pointer" onclick="openMenuPhoto('${p}')"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+        </div>`;
+    }else menuEl.innerHTML='';
+  }
+}
+
+window.slideBizPhoto=(prefix,dir)=>{
+  const total = window[`_${prefix}PhotoTotal`]||1;
+  const cur = ((window[`_${prefix}PhotoCur`]||0)+dir+total)%total;
+  window[`_${prefix}PhotoCur`]=cur;
+  const slider = document.getElementById(prefix+'PhotoSlider');
+  if(slider) slider.style.transform=`translateX(-${cur*100}%)`;
+  document.querySelectorAll(`.${prefix}pdot`).forEach((d,i)=>{
+    d.style.width=i===cur?'16px':'6px';
+    d.style.background=i===cur?'#fff':'rgba(255,255,255,0.5)';
+  });
+};
+
+// 기존 함수들은 공통 함수로 위임
+window.slidePhoto=(dir)=>slideBizPhoto('d',dir);
+window.slideHdPhoto=(dir)=>slideBizPhoto('hd',dir);
 async function drawHotMap(b){
   const box=$('hd-map');
   if(!b.lat||!b.lng){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:13px">위치 정보 없음</div>';return;}
@@ -1174,74 +1212,18 @@ window.openDetail=async(respId)=>{
   const bizPhoto = b.photo||r.photo||'';
 
   subShow('u-detail');
-
-  // 사진 슬라이드
-  const photos = b.photos&&b.photos.length ? b.photos : (bizPhoto ? [bizPhoto] : []);
-  if(photos.length){
-    $('d-photo').innerHTML=`
-      <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
-        <div id="photoSlider" style="display:flex;transition:transform .35s ease;will-change:transform">
-          ${photos.map(p=>`<div style="min-width:100%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
-        </div>
-        ${photos.length>1?`
-        <button onclick="slidePhoto(-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
-        <button onclick="slidePhoto(1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">›</button>
-        <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
-          ${photos.map((_,i)=>`<div class="pdot" data-i="${i}" style="width:${i===0?'16':'6'}px;height:6px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.5)'};transition:.2s"></div>`).join('')}
-        </div>`:''}
-      </div>`;
-    window._photoCur=0; window._photoTotal=photos.length;
-  }else{
-    $('d-photo').innerHTML = photoFallback(c);
-  }
-  $('d-name').textContent=r.bizName||'매장';
-  $('d-meta').textContent=`${c.e} ${c.n} · ${distLabel(r.dist)}`;
+  renderBizDetail(b, 'd');
+  // 호출 상태 뱃지 (d-detail 전용)
   $('d-badge').innerHTML = r.type==='ok'?'<span class="badge bd-ok">지금 가능</span>':'<span class="badge bd-soon">10분 후</span>';
-  // 길찾기 링크
-  if(b.lat&&b.lng)$('d-route').href=NW.kakaoRoute(r.bizName,b.lat,b.lng);
+  // 길찾기 (renderBizDetail에서 처리되지만 dist 포함 meta 재설정)
+  $('d-meta').textContent=`${catOf(r.cat||sel.cats[0]).e} ${catOf(r.cat||sel.cats[0]).n} · ${distLabel(r.dist)}`;
+  if(b.lat&&b.lng){ $('d-route').href=NW.kakaoRoute(r.bizName,b.lat,b.lng); $('d-route').classList.remove('hide'); }
   else $('d-route').classList.add('hide');
-  // 메뉴
-  renderMenu(b);
-  // 영업정보
-  renderInfo(b);
   // 지도
   drawMap(b);
 };
-function photoFallback(c){return `<div style="width:100%;height:170px;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:64px">${c.e}</div>`;}
-window.slideHdPhoto=(dir)=>{
-  const total=window._hdPhotoTotal||1;
-  window._hdPhotoCur=((window._hdPhotoCur||0)+dir+total)%total;
-  const slider=document.getElementById('hdPhotoSlider');
-  if(slider) slider.style.transform=`translateX(-${window._hdPhotoCur*100}%)`;
-  document.querySelectorAll('.hpdot').forEach((d,i)=>{
-    d.style.width=i===window._hdPhotoCur?'16px':'6px';
-    d.style.background=i===window._hdPhotoCur?'#fff':'rgba(255,255,255,0.5)';
-  });
-};
+function photoFallback(c){return `<div style="width:100%;aspect-ratio:4/3;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:64px">${c.e}</div>`;}
 
-window.slidePhoto=(dir)=>{
-  const total = window._photoTotal||1;
-  window._photoCur = ((window._photoCur||0)+dir+total)%total;
-  const slider = document.getElementById('photoSlider');
-  if(slider) slider.style.transform=`translateX(-${window._photoCur*100}%)`;
-  document.querySelectorAll('.pdot').forEach((d,i)=>{
-    d.style.width = i===window._photoCur?'16px':'6px';
-    d.style.background = i===window._photoCur?'#fff':'rgba(255,255,255,0.5)';
-  });
-};
-
-function renderMenu(b){
-  const photos = b.menuPhotos;
-  if(!photos||!photos.length){$('d-menu').innerHTML='';return;}
-  $('d-menu').innerHTML=`
-    <div class="h2" style="margin-top:24px">🍽 메뉴판</div>
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px">
-      ${photos.map(p=>`
-        <div style="border-radius:10px;overflow:hidden;aspect-ratio:3/4;cursor:pointer" onclick="openMenuPhoto('${p}')">
-          <img src="${p}" style="width:100%;height:100%;object-fit:cover">
-        </div>`).join('')}
-    </div>`;
-}
 window.openMenuPhoto=(url)=>{
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px';
@@ -1249,19 +1231,6 @@ window.openMenuPhoto=(url)=>{
   overlay.onclick=()=>overlay.remove();
   document.body.appendChild(overlay);
 };
-function renderInfo(b){
-  const rows=[];
-  if(b.desc) rows.push(['소개',b.desc]);
-  if(b.addr) rows.push(['주소',b.addr]);
-  if(b.hours) rows.push(['영업시간',b.hours]);
-  if(b.phone) rows.push(['전화',`<a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a>`]);
-  if(b.website) rows.push(['홈페이지',`<a href="${b.website}" target="_blank" style="color:var(--y)">바로가기</a>`]);
-  rows.push(['주차',b.parking?'✅ 가능':'❌ 불가']);
-  rows.push(['예약',b.reservation?'✅ 가능':'❌ 불가']);
-  if(!rows.length){ $('d-info').innerHTML=''; return; }
-  $('d-info').innerHTML=`<div class="h2" style="margin-top:24px">📋 매장 정보</div><div class="bizdetail">`+
-    rows.map(r=>`<div class="row"><span style="color:var(--tx3);flex-shrink:0">${r[0]}</span><b style="text-align:right;word-break:break-all">${r[1]}</b></div>`).join('')+`</div>`;
-}
 async function drawMap(b){
   const box=$('d-map');
   if(!b.lat||!b.lng){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:13px">위치 정보 없음</div>';return;}

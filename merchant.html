@@ -104,6 +104,14 @@
       <input type="hidden" id="ePhoto">
       <input type="hidden" id="ePhotos">
     </div>
+    <div class="field"><div class="field-lb">메뉴판 사진 <span id="mMenuCnt">0</span>장</div>
+      <div id="mMenuGallery" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;min-height:60px;margin-bottom:10px"></div>
+      <input type="file" id="eMenuFile" accept="image/*" class="hide" onchange="handleMenuPhotoSelect(event)">
+      <div style="display:flex;gap:8px">
+        <button class="cta ghost" style="margin-top:0;flex:1" onclick="$('eMenuFile').click()">📷 파일 추가</button>
+        <button class="cta ghost" style="margin-top:0;flex:1" onclick="addMenuPhotoByUrl()">🔗 URL 추가</button>
+      </div>
+    </div>
     <div class="field"><div class="field-lb">소개글 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
       <textarea class="inp" id="eDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="resize:vertical"></textarea></div>
     <div class="field"><div class="field-lb">홈페이지 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
@@ -300,6 +308,10 @@ window.openEdit=()=>{
   const existingPhotos = myBiz.photos && myBiz.photos.length ? myBiz.photos : (myBiz.photo ? [myBiz.photo] : []);
   setMerchantPhotos(existingPhotos);
   renderMerchantGallery(existingPhotos);
+  // 메뉴판 사진
+  const existingMenuPhotos = myBiz.menuPhotos||[];
+  setMerchantMenuPhotos(existingMenuPhotos);
+  renderMerchantMenuGallery(existingMenuPhotos);
   $('eWebsite').value=myBiz.website||'';
   $('eDesc').value=myBiz.desc||'';
   $('eHours').value=myBiz.hours||'';
@@ -344,12 +356,45 @@ window.removeMerchantPhoto=(idx)=>{
 };
 window.addPhotoByUrl=()=>{
   const urls=getMerchantPhotos();
-  if(urls.length>=10){ toast('사진은 최대 10장까지 가능해요'); return; }
-  const url=prompt('사진 URL을 입력하세요:');
-  if(!url||!url.trim()) return;
-  urls.push(url.trim());
-  setMerchantPhotos(urls);
-  renderMerchantGallery(urls);
+  const url=prompt('사진 URL을 입력하세요:'); if(!url||!url.trim()) return;
+  urls.push(url.trim()); setMerchantPhotos(urls); renderMerchantGallery(urls);
+};
+
+// 메뉴판 사진
+function getMerchantMenuPhotos(){
+  try{ return JSON.parse($('eMenuPhotos')?.value||'[]'); }catch(e){ return []; }
+}
+function setMerchantMenuPhotos(urls){
+  if(!$('eMenuPhotos')){
+    const inp=document.createElement('input');inp.type='hidden';inp.id='eMenuPhotos';
+    document.getElementById('m-edit')?.appendChild(inp);
+  }
+  if($('eMenuPhotos')) $('eMenuPhotos').value=JSON.stringify(urls);
+  if($('mMenuCnt')) $('mMenuCnt').textContent=urls.length;
+}
+function renderMerchantMenuGallery(urls){
+  const el=$('mMenuGallery'); if(!el) return;
+  if(!urls.length){ el.innerHTML=`<div style="grid-column:1/-1;height:60px;border:1.5px dashed var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:13px">메뉴판 사진 추가</div>`; return; }
+  el.innerHTML=urls.map((u,i)=>`<div style="position:relative;border-radius:10px;overflow:hidden;aspect-ratio:1"><img src="${u}" style="width:100%;height:100%;object-fit:cover"><button onclick="removeMerchantMenuPhoto(${i})" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;border:none;width:22px;height:22px;border-radius:50%;font-size:12px;cursor:pointer">✕</button></div>`).join('');
+}
+window.removeMerchantMenuPhoto=(i)=>{const urls=getMerchantMenuPhotos();urls.splice(i,1);setMerchantMenuPhotos(urls);renderMerchantMenuGallery(urls);};
+window.addMenuPhotoByUrl=()=>{
+  const url=prompt('메뉴판 사진 URL:'); if(!url||!url.trim()) return;
+  const urls=getMerchantMenuPhotos(); urls.push(url.trim()); setMerchantMenuPhotos(urls); renderMerchantMenuGallery(urls);
+};
+window.handleMenuPhotoSelect=async(event)=>{
+  const file=event.target.files[0]; if(!file) return;
+  toast('업로드 중…');
+  try{
+    const {storageRef,uploadBytes,getDownloadURL}=NW.fb;
+    const path=`menu_photos/${myBizId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g,'_')}`;
+    const ref=storageRef(NW.storage,path);
+    await uploadBytes(ref,file);
+    const url=await getDownloadURL(ref);
+    const urls=getMerchantMenuPhotos(); urls.push(url); setMerchantMenuPhotos(urls); renderMerchantMenuGallery(urls);
+    toast('✅ 업로드 완료');
+  }catch(e){toast('실패: '+e.message);}
+  event.target.value='';
 };
 window.handlePhotoSelect=async(event)=>{
   const file=event.target.files[0];
@@ -438,8 +483,9 @@ window.saveEdit=async()=>{
   if(isNaN(lat)||isNaN(lng)){toast('위치 좌표가 필요해요');return;}
   
   const photos = getMerchantPhotos();
+  const menuPhotos = getMerchantMenuPhotos();
   const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,minParty:eSel.minParty||1,lat,lng,
-    photo:photos[0]||'', photos,
+    photo:photos[0]||'', photos, menuPhotos,
     desc:$('eDesc')?.value.trim()||'',
     website:$('eWebsite').value.trim(),
     hours:$('eHours').value.trim(),phone:$('ePhone').value.trim(),
