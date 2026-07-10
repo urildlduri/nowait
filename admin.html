@@ -1027,6 +1027,8 @@ window.toggleEvent=async(evId, active, bizId)=>{
   loadBizEvents(bizId);
   toast(active?'✅ 이벤트 활성화':'이벤트 비활성화');
 };
+
+window.saveBizEdit=async(bizId)=>{
   const {doc,updateDoc} = NW.fb;
   const photos = getAdminPhotos();
   const menuPhotos = getAdminMenuPhotos();
