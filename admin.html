@@ -133,9 +133,14 @@
       <div class="adm-list" id="feed"><div class="adm-empty">호출 대기 중…</div></div>
     </div>
     <div class="adm-panel">
-      <h3>승인 매장 <span class="cnt" id="bizCnt">0곳</span></h3>
+      <h3>📋 사전 등록 매장 <span class="cnt" id="preCreatedCnt">0곳</span></h3>
       <div id="bizCatFilter" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
-      <div class="adm-list" id="bizList"><div class="adm-empty">승인된 매장이 없습니다.</div></div>
+      <div class="adm-list" id="preCreatedList"><div class="adm-empty">사전 등록 매장이 없습니다.</div></div>
+      <h3 style="margin-top:24px">🤝 파트너 신청 매장 <span class="cnt" id="partnerCnt">0곳</span></h3>
+      <div class="adm-list" id="partnerList"><div class="adm-empty">파트너 신청 매장이 없습니다.</div></div>
+      <!-- 기존 bizList는 카테고리 필터용으로 유지 -->
+      <div id="bizList" class="hide"></div>
+      <span id="bizCnt" class="hide"></span>
     </div>
   </div>
 </div>
@@ -263,9 +268,8 @@ function renderBiz(){
       + NW.CATS.map(c=>`<button class="adm-btn" id="bcat-${c.k}" onclick="setBizCatFilter('${c.k}')" style="padding:5px 10px;font-size:12px">${c.e} ${c.n}</button>`).join('');
   }
 
-  // 승인 매장
+  // 승인 매장 — 사전생성 vs 파트너신청 구분
   $('bizCnt').textContent=approved.length+'곳';$('sBiz').textContent=approved.length;
-  if(!approved.length){$('bizList').innerHTML='<div class="adm-empty">승인된 매장이 없습니다.</div>';return;}
   window._approvedBiz = approved;
   renderBizFiltered(window._bizCatFilter||'all');
 }
@@ -280,28 +284,45 @@ window.setBizCatFilter=(cat)=>{
   renderBizFiltered(cat);
 };
 
+function renderBizCard(b){
+  const cat=catOf(b.cat);const st=BST[b.status]||['?','st-closed'];
+  const rating=b.ratingAvg?`⭐ ${(+b.ratingAvg).toFixed(1)}(${b.ratingCount||0})`:'';
+  const hotBtn=b.isHot
+    ? `<button class="adm-btn" style="padding:6px 10px;color:var(--y);border-color:var(--y)" onclick="event.stopPropagation();toggleHot('${b.id}',false)">🔥 핫플 ON</button>`
+    : `<button class="adm-btn" style="padding:6px 10px" onclick="event.stopPropagation();toggleHot('${b.id}',true)">🔥 핫플 OFF</button>`;
+  return `<div class="adm-row" style="cursor:pointer" onclick="openBizDetail('${b.id}')">
+    ${b.photo
+      ? `<img src="${b.photo}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0">`
+      : `<div class="em">${cat.e}</div>`}
+    <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[테스트]</span>':''}${b.hasEvent?'<span style="background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px">🎉 이벤트</span>':''}</b>
+    <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.merchantId?`<span style="font-family:var(--mono);color:var(--y)">${b.merchantId}</span> · `:''}${b.ownerName||b.ownerEmail||'-'} ${rating?'· '+rating:''}</small></div>
+    <span class="st ${st[1]}">${st[0]}</span>
+    <div class="adm-row-btns">
+      ${hotBtn}
+      <button class="adm-btn" style="padding:6px 10px;color:var(--y);border-color:var(--y)" onclick="event.stopPropagation();openBizEdit('${b.id}')">✏️ 편집</button>
+      <button class="adm-btn danger" style="padding:6px 10px" onclick="event.stopPropagation();reject('${b.id}','${(b.name||'').replace(/'/g,'')}')">삭제</button>
+    </div></div>`;
+}
+
 function renderBizFiltered(cat){
   const approved = window._approvedBiz || [];
   const list = cat==='all' ? approved : approved.filter(b=>b.cat===cat);
-  $('bizCnt').textContent = list.length+'곳';
-  if(!list.length){$('bizList').innerHTML=`<div class="adm-empty">${cat==='all'?'승인된 매장이 없습니다.':'해당 카테고리 매장이 없어요.'}</div>`;return;}
-  $('bizList').innerHTML=list.map(b=>{const cat=catOf(b.cat);const st=BST[b.status]||['?','st-closed'];
-    const rating=b.ratingAvg?`⭐ ${(+b.ratingAvg).toFixed(1)}(${b.ratingCount||0})`:'';
-    const hotBtn=b.isHot
-      ? `<button class="adm-btn" style="padding:6px 10px;color:var(--y);border-color:var(--y)" onclick="event.stopPropagation();toggleHot('${b.id}',false)">🔥 핫플 ON</button>`
-      : `<button class="adm-btn" style="padding:6px 10px" onclick="event.stopPropagation();toggleHot('${b.id}',true)">🔥 핫플 OFF</button>`;
-    return `<div class="adm-row" style="cursor:pointer" onclick="openBizDetail('${b.id}')">
-      ${b.photo
-        ? `<img src="${b.photo}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0">`
-        : `<div class="em">${cat.e}</div>`}
-      <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[테스트]</span>':''}${b.hasEvent?'<span style="background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px">🎉 이벤트</span>':''}</b>
-      <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.merchantId?`<span style="font-family:var(--mono);color:var(--y)">${b.merchantId}</span> · `:''}${b.ownerName||b.ownerEmail||'-'} ${rating?'· '+rating:''}</small></div>
-      <span class="st ${st[1]}">${st[0]}</span>
-      <div class="adm-row-btns">
-        ${hotBtn}
-        <button class="adm-btn" style="padding:6px 10px;color:var(--y);border-color:var(--y)" onclick="event.stopPropagation();openBizEdit('${b.id}')">✏️ 편집</button>
-        <button class="adm-btn danger" style="padding:6px 10px" onclick="event.stopPropagation();reject('${b.id}','${(b.name||'').replace(/'/g,'')}')">삭제</button>
-      </div></div>`;}).join('');
+
+  // 사전 생성 (merchantId 있음)
+  const preCreated = list.filter(b=>b.merchantId);
+  // 파트너 신청 (사장님이 직접 신청)
+  const partnerApplied = list.filter(b=>!b.merchantId && !b.demo);
+
+  $('preCreatedCnt').textContent = preCreated.length+'곳';
+  $('partnerCnt').textContent = partnerApplied.length+'곳';
+
+  $('preCreatedList').innerHTML = preCreated.length
+    ? preCreated.map(renderBizCard).join('')
+    : `<div class="adm-empty">사전 등록 매장이 없어요.</div>`;
+
+  $('partnerList').innerHTML = partnerApplied.length
+    ? partnerApplied.map(renderBizCard).join('')
+    : `<div class="adm-empty">파트너 신청 매장이 없어요.</div>`;
 }
 
 window.toggleHot=async(id,on)=>{
