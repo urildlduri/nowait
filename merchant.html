@@ -444,6 +444,9 @@ window.eSearchAddr=()=>{
   NW.searchAddress(r=>{
     $('eAddr').textContent='📍 '+r.address;
     if(r.lat&&r.lng){$('eLat').value=r.lat.toFixed(6);$('eLng').value=r.lng.toFixed(6);drawEditMap();toast('주소 위치로 설정됨');}
+    // 동네 자동 추출
+    const areaMap=[['강남','강남'],['역삼','역삼'],['선릉','선릉'],['삼성','강남'],['건대','건대'],['건국대','건대'],['광진','건대'],['홍대','홍대'],['홍익','홍대'],['합정','홍대'],['상수','홍대'],['이태원','이태원'],['한남','이태원'],['신촌','신촌'],['연세','신촌'],['이대','신촌'],['압구정','압구정'],['청담','청담'],['잠실','잠실'],['송파','잠실']];
+    const el=$('eArea'); if(el){ for(const [k,v] of areaMap){ if(r.address.includes(k)){el.value=v;break;} } }
   });
 };
 async function drawEditMap(){

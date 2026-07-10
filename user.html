@@ -1840,8 +1840,26 @@ window.pSearchAddr=()=>{
     $('pAddr').textContent='📍 '+r.address;
     if(r.lat&&r.lng) pApplyLoc({lat:r.lat,lng:r.lng,name:r.address});
     else pShowPicker();
+    // 주소에서 동네 자동 추출
+    autoDetectArea(r.address);
   });
 };
+
+function autoDetectArea(addr){
+  const areaMap = [
+    ['강남','강남'], ['역삼','역삼'], ['선릉','선릉'], ['삼성','강남'],
+    ['건대','건대'], ['건국대','건대'], ['광진','건대'],
+    ['홍대','홍대'], ['홍익','홍대'], ['합정','홍대'], ['상수','홍대'],
+    ['이태원','이태원'], ['한남','이태원'],
+    ['신촌','신촌'], ['연세','신촌'], ['이대','신촌'],
+    ['압구정','압구정'], ['청담','청담'],
+    ['잠실','잠실'], ['송파','잠실'],
+  ];
+  const el=$('pArea'); if(!el) return;
+  for(const [keyword, area] of areaMap){
+    if(addr.includes(keyword)){ el.value=area; return; }
+  }
+}
 function pChk(){const b=$('pBtn');if(b)b.disabled=!($('pName').value.trim()&&pSel.cat&&pLoc);}
 window.submitPartner=async()=>{
   const {collection,addDoc,serverTimestamp}=NW.fb;
