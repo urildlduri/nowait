@@ -81,6 +81,20 @@
     <div class="brand" style="font-size:30px">매장 정보 수정</div>
     <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="eName"></div>
     <div class="field"><div class="field-lb">업종</div><div class="chips" id="eCat"></div></div>
+    <div class="field"><div class="field-lb">동네</div>
+      <select class="inp" id="eArea">
+        <option value="">선택 안함</option>
+        <option value="강남">강남</option>
+        <option value="건대">건대</option>
+        <option value="홍대">홍대</option>
+        <option value="신촌">신촌</option>
+        <option value="이태원">이태원</option>
+        <option value="역삼">역삼</option>
+        <option value="선릉">선릉</option>
+        <option value="압구정">압구정</option>
+        <option value="청담">청담</option>
+        <option value="잠실">잠실</option>
+      </select></div>
     <div class="field"><div class="field-lb">수신 반경</div><div class="chips" id="eRad"></div></div>
     <div class="field"><div class="field-lb">최소 수용 인원 <span style="color:var(--tx3);font-weight:500">(이 인원 미만 호출은 안 받음)</span></div>
       <div class="chips" id="eMinParty"></div></div>
@@ -316,6 +330,7 @@ window.openEdit=()=>{
   $('eDesc').value=myBiz.desc||'';
   $('eHours').value=myBiz.hours||'';
   $('ePhone').value=myBiz.phone||'';
+  if($('eArea')) $('eArea').value=myBiz.area||'';
   // 최소인원 칩
   const minP = myBiz.minParty||1;
   $('eMinPartyChips').innerHTML=[1,2,3,4,5].map(n=>`<button class="chip ${n===minP?'on':''}" data-m="${n}" onclick="ePickMin(${n})">${n}명+</button>`).join('');
@@ -485,6 +500,7 @@ window.saveEdit=async()=>{
   const photos = getMerchantPhotos();
   const menuPhotos = getMerchantMenuPhotos();
   const patch={name:$('eName').value.trim(),cat:eSel.cat,radius:eSel.rad,minParty:eSel.minParty||1,lat,lng,
+    area:$('eArea')?.value||'',
     photo:photos[0]||'', photos, menuPhotos,
     desc:$('eDesc')?.value.trim()||'',
     website:$('eWebsite').value.trim(),

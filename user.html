@@ -298,10 +298,14 @@
     <div class="page">
       <div class="h1">🔥 핫플</div>
       <!-- 동네별 이미지 필터 -->
-      <div style="overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:12px 20px">
+      <div style="overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:12px 20px 8px">
         <div id="hotAreaFilter" style="display:flex;gap:10px;width:max-content"></div>
       </div>
-      <div class="muted" style="margin:8px 0 14px"><span id="hotMore"></span></div>
+      <!-- 카테고리 필터 -->
+      <div style="overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:4px 20px 10px">
+        <div id="hotCatFilter" style="display:flex;gap:6px;width:max-content"></div>
+      </div>
+      <div class="muted" style="margin:4px 0 14px"><span id="hotMore"></span></div>
       <div id="hotList"><div class="muted" style="font-size:13px">핫플을 불러오는 중…</div></div>
     </div>
   </div>
@@ -400,7 +404,7 @@ function subShow(id){
 window.uGo=(id,nav)=>{subShow(id);document.querySelectorAll('.bnav button').forEach(b=>b.classList.remove('on'));$(nav).classList.add('on');if(id==='u-my')renderMy();if(id==='u-partner')renderPartner();if(id==='u-hot')loadHotplaces(true);};
 
 function init(){
-  buildChips(); getLoc(); buildHotAreaFilter();
+  buildChips(); getLoc(); buildHotAreaFilter(); buildHotCatFilter();
   NW.onAuth(async u=>{
     if(!u){ location.href='index.html'; return; }
     const role=await NW.getRole(u);
@@ -541,9 +545,9 @@ async function loadHotplaces(force){
       : all.slice(0,5);
     renderHomeHot(nearby);
 
-    // 핫플 탭 — 전체 (지역별 필터용)
+    // 핫플 탭 — 전체 (지역별+카테고리 필터용)
     _hotAll = all.sort((a,b)=>(a._dist||99999)-(b._dist||99999));
-    renderHotList(_hotFilter==='all' ? _hotAll : _hotAll.filter(h=>(h.addr||'').includes(_hotFilter)));
+    applyHotFilters();
   }catch(e){ console.warn('hotplace load',e); $('hotList').innerHTML='<div class="muted" style="font-size:13px">핫플을 불러오지 못했어요.</div>'; }
 }
 const HOT_AREAS = [
@@ -561,7 +565,7 @@ function buildHotAreaFilter(){
     const inner = isAll
       ? `<div style="width:72px;height:72px;border-radius:16px;background:var(--y);display:flex;align-items:center;justify-content:center;font-size:28px;border:2px solid var(--y)">${a.e}</div>`
       : `<div class="hf-img-wrap" data-key="${a.k}" style="width:72px;height:72px;border-radius:16px;overflow:hidden;border:2px solid transparent;position:relative">
-           <img src="${a.img}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentNode.style.background='var(--bg3)';this.parentNode.innerHTML+='<div style=position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px>${a.e}</div>'">
+           <img src="${a.img}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentNode.style.background='var(--bg3)'">
            <div style="position:absolute;inset:0;background:rgba(0,0,0,0.25)"></div>
          </div>`;
     return `<div onclick="setHotFilter('${a.k}')" id="hf-${a.k}" style="cursor:pointer;text-align:center;flex-shrink:0">
@@ -571,17 +575,36 @@ function buildHotAreaFilter(){
   }).join('');
 }
 
+function buildHotCatFilter(){
+  const el=$('hotCatFilter'); if(!el) return;
+  el.innerHTML = `<button class="chip on" id="hcat-all" onclick="setHotCatFilter('all')">전체</button>`
+    + NW.CATS.map(c=>`<button class="chip" id="hcat-${c.k}" onclick="setHotCatFilter('${c.k}')">${c.e} ${c.n}</button>`).join('');
+}
+
+let _hotCatFilter='all';
+window.setHotCatFilter=(cat)=>{
+  _hotCatFilter=cat;
+  document.querySelectorAll('[id^="hcat-"]').forEach(b=>b.classList.toggle('on',b.id==='hcat-'+cat));
+  applyHotFilters();
+};
+
 let _hotAll=[], _hotFilter='all';
 window.setHotFilter=(area)=>{
   _hotFilter=area;
-  const allEl=$('hf-all');
-  if(allEl) allEl.querySelector('div').style.borderColor=area==='all'?'var(--y)':'var(--y)';
   document.querySelectorAll('.hf-img-wrap').forEach(w=>{
     w.style.borderColor=w.dataset.key===area?'var(--y)':'transparent';
   });
-  const list=area==='all'?_hotAll:_hotAll.filter(h=>(h.addr||h.name||'').includes(area));
-  renderHotList(list);
+  const allEl=$('hf-all');
+  if(allEl){const d=allEl.querySelector('div');if(d)d.style.borderColor=area==='all'?'var(--y)':'var(--y)';}
+  applyHotFilters();
 };
+
+function applyHotFilters(){
+  let list=_hotAll;
+  if(_hotFilter!=='all') list=list.filter(h=>(h.area||h.addr||h.name||'').includes(_hotFilter));
+  if(_hotCatFilter!=='all') list=list.filter(h=>h.cat===_hotCatFilter);
+  renderHotList(list);
+}
 
 function renderHomeHot(list){
   // 홈 미리보기 — 위치 기반 근처 핫플
@@ -1679,6 +1702,20 @@ async function renderPartner(){
   body.innerHTML=`
     <div class="field"><div class="field-lb">매장 이름</div><input class="inp" id="pName" placeholder="예) 강남 라운지펍"></div>
     <div class="field"><div class="field-lb">업종</div><div class="chips" id="pCat"></div></div>
+    <div class="field"><div class="field-lb">동네</div>
+      <select class="inp" id="pArea">
+        <option value="">선택 안함</option>
+        <option value="강남">강남</option>
+        <option value="건대">건대</option>
+        <option value="홍대">홍대</option>
+        <option value="신촌">신촌</option>
+        <option value="이태원">이태원</option>
+        <option value="역삼">역삼</option>
+        <option value="선릉">선릉</option>
+        <option value="압구정">압구정</option>
+        <option value="청담">청담</option>
+        <option value="잠실">잠실</option>
+      </select></div>
     <div class="field"><div class="field-lb">주소</div>
       <div style="display:flex;gap:8px">
         <input class="inp" id="pAddrInp" placeholder="주소 입력" style="flex:1;margin:0">
@@ -1810,6 +1847,7 @@ window.submitPartner=async()=>{
   const {collection,addDoc,serverTimestamp}=NW.fb;
   await addDoc(collection(NW.db,'nw_biz'),{
     name:$('pName').value.trim(), cat:pSel.cat, radius:pSel.rad, minParty:pSel.minParty||1,
+    area:$('pArea')?.value||'',
     lat:pLoc.lat, lng:pLoc.lng, addr:$('pAddrInp')?.value.trim()||'',
     status:'open', approved:false,
     ownerId:NW.uid, ownerName:NW.user?.displayName||'', ownerEmail:NW.user?.email||'',

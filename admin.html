@@ -802,6 +802,20 @@ window.openBizEdit=async(bizId)=>{
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px">
+        <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">동네</div>
+          <select class="inp" id="beArea" style="margin:0">
+            <option value="">선택 안함</option>
+            <option value="강남">강남</option>
+            <option value="건대">건대</option>
+            <option value="홍대">홍대</option>
+            <option value="신촌">신촌</option>
+            <option value="이태원">이태원</option>
+            <option value="역삼">역삼</option>
+            <option value="선릉">선릉</option>
+            <option value="압구정">압구정</option>
+            <option value="청담">청담</option>
+            <option value="잠실">잠실</option>
+          </select></div>
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">매장명</div>
           <input class="inp" id="beN" value="${b.name||''}" placeholder="매장명" style="margin:0"></div>
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">업종</div>
@@ -860,8 +874,11 @@ window.openBizEdit=async(bizId)=>{
       <button onclick="document.getElementById('bizEditOverlay').remove()" style="width:100%;padding:12px;background:var(--bg3);color:var(--tx2);border:none;border-radius:12px;font-size:14px;font-weight:700;margin-top:8px;cursor:pointer">닫기</button>
     </div>`;
   document.body.appendChild(overlay);
-  // 기존 이벤트 로드
-  setTimeout(()=>loadBizEvents(bizId), 200);
+  setTimeout(()=>{
+    const areaEl=document.getElementById('beArea');
+    if(areaEl) areaEl.value=b.area||'';
+    loadBizEvents(bizId);
+  },200);
 };
 
 window.handleAdminPhotoUpload=async(event, bizId)=>{
@@ -1056,6 +1073,7 @@ window.saveBizEdit=async(bizId)=>{
   const data = {
     name: document.getElementById('beN').value.trim(),
     cat: document.getElementById('beCat').value,
+    area: document.getElementById('beArea')?.value||'',
     addr: document.getElementById('beAddr').value.trim(),
     phone: document.getElementById('bePhone').value.trim(),
     hours: document.getElementById('beHours').value.trim(),
