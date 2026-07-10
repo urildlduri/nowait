@@ -294,8 +294,8 @@ function renderBizFiltered(cat){
       ${b.photo
         ? `<img src="${b.photo}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;flex-shrink:0">`
         : `<div class="em">${cat.e}</div>`}
-      <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[데모]</span>':''}${b.hasEvent?'<span style="background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px">🎉 이벤트</span>':''}</b>
-      <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.merchantId?`<span style="font-family:var(--mono);color:var(--y)">${b.merchantId}</span> · `:''}${b.ownerName||b.ownerEmail||'데모'} ${rating?'· '+rating:''}</small></div>
+      <div class="mid"><b>${b.name||'매장'} ${b.demo?'<span style="color:var(--tx3);font-size:11px">[테스트]</span>':''}${b.hasEvent?'<span style="background:#8B5CF6;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:4px">🎉 이벤트</span>':''}</b>
+      <small>${cat.n} · 반경 ${distLabel(b.radius||1000)} · ${b.merchantId?`<span style="font-family:var(--mono);color:var(--y)">${b.merchantId}</span> · `:''}${b.ownerName||b.ownerEmail||'-'} ${rating?'· '+rating:''}</small></div>
       <span class="st ${st[1]}">${st[0]}</span>
       <div class="adm-row-btns">
         ${hotBtn}
