@@ -297,21 +297,35 @@
   <div id="u-hot" class="scr">
     <div class="page">
       <div class="h1">🔥 핫플</div>
-      <!-- 동네별 필터 -->
-      <div style="display:flex;gap:8px;overflow-x:auto;padding:12px 0;scrollbar-width:none;margin-bottom:4px">
-        <button class="chip on" id="hf-all" onclick="setHotFilter('all')">전체</button>
-        <button class="chip" id="hf-강남" onclick="setHotFilter('강남')">강남</button>
-        <button class="chip" id="hf-역삼" onclick="setHotFilter('역삼')">역삼</button>
-        <button class="chip" id="hf-선릉" onclick="setHotFilter('선릉')">선릉</button>
-        <button class="chip" id="hf-건대" onclick="setHotFilter('건대')">건대</button>
-        <button class="chip" id="hf-홍대" onclick="setHotFilter('홍대')">홍대</button>
-        <button class="chip" id="hf-이태원" onclick="setHotFilter('이태원')">이태원</button>
-        <button class="chip" id="hf-신촌" onclick="setHotFilter('신촌')">신촌</button>
-        <button class="chip" id="hf-압구정" onclick="setHotFilter('압구정')">압구정</button>
-        <button class="chip" id="hf-청담" onclick="setHotFilter('청담')">청담</button>
-        <button class="chip" id="hf-잠실" onclick="setHotFilter('잠실')">잠실</button>
+      <!-- 동네별 이미지 필터 -->
+      <div style="overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:12px 20px">
+        <div style="display:flex;gap:10px;width:max-content">
+          <div onclick="setHotFilter('all')" id="hf-all" style="cursor:pointer;text-align:center;flex-shrink:0">
+            <div style="width:72px;height:72px;border-radius:16px;overflow:hidden;border:2px solid var(--y);background:var(--y);display:flex;align-items:center;justify-content:center;font-size:28px">🔥</div>
+            <div style="font-size:11px;font-weight:700;color:var(--y);margin-top:5px">전체</div>
+          </div>
+          ${[
+            {k:'강남',e:'🌃',img:'https://images.unsplash.com/photo-1538669715315-155098f0fb1d?w=200&q=80'},
+            {k:'건대',e:'🎸',img:'https://images.unsplash.com/photo-1551524164-6cf2ac61dd82?w=200&q=80'},
+            {k:'홍대',e:'🎨',img:'https://images.unsplash.com/photo-1583422409516-2895a77efded?w=200&q=80'},
+            {k:'이태원',e:'🌍',img:'https://images.unsplash.com/photo-1577017040065-650ee4d43339?w=200&q=80'},
+            {k:'신촌',e:'🎓',img:'https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=200&q=80'},
+            {k:'역삼',e:'💼',img:'https://images.unsplash.com/photo-1555993539-1732b0258235?w=200&q=80'},
+            {k:'선릉',e:'🌿',img:'https://images.unsplash.com/photo-1548864571-82543f1b3c90?w=200&q=80'},
+            {k:'압구정',e:'💎',img:'https://images.unsplash.com/photo-1534430480872-3498386e7856?w=200&q=80'},
+            {k:'청담',e:'✨',img:'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&q=80'},
+            {k:'잠실',e:'🏟️',img:'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=200&q=80'},
+          ].map(a=>`
+          <div onclick="setHotFilter('${a.k}')" id="hf-${a.k}" style="cursor:pointer;text-align:center;flex-shrink:0">
+            <div style="width:72px;height:72px;border-radius:16px;overflow:hidden;border:2px solid transparent;position:relative" class="hf-img-wrap" data-key="${a.k}">
+              <img src="${a.img}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.innerHTML='<div style=width:100%;height:100%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:28px>${a.e}</div>'">
+              <div style="position:absolute;inset:0;background:rgba(0,0,0,0.2)"></div>
+            </div>
+            <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-top:5px">${a.k}</div>
+          </div>`).join('')}
+        </div>
       </div>
-      <div class="muted" style="margin-bottom:14px"><span id="hotMore"></span></div>
+      <div class="muted" style="margin:8px 0 14px"><span id="hotMore"></span></div>
       <div id="hotList"><div class="muted" style="font-size:13px">핫플을 불러오는 중…</div></div>
     </div>
   </div>
@@ -559,7 +573,15 @@ async function loadHotplaces(force){
 let _hotAll=[], _hotFilter='all';
 window.setHotFilter=(area)=>{
   _hotFilter=area;
-  document.querySelectorAll('[id^="hf-"]').forEach(b=>b.classList.toggle('on', b.id==='hf-'+area));
+  // 전체 버튼
+  const allBtn = document.getElementById('hf-all');
+  if(allBtn) allBtn.querySelector('div').style.borderColor = area==='all'?'var(--y)':'transparent';
+  // 동네 이미지 카드
+  document.querySelectorAll('.hf-img-wrap').forEach(w=>{
+    const isOn = w.dataset.key===area;
+    w.style.borderColor = isOn?'var(--y)':'transparent';
+    w.style.outline = isOn?'2px solid var(--y)':'none';
+  });
   const list = area==='all' ? _hotAll : _hotAll.filter(h=>(h.addr||h.name||'').includes(area));
   renderHotList(list);
 };
