@@ -721,7 +721,7 @@ function renderBizDetail(b, prefix){
 
   // 영업정보 통합 (소개글+주소+연락처+영업시간+편의)
   const infoRows=[];
-  if(b.desc) infoRows.push(['소개',`<span style="color:var(--tx2);white-space:pre-wrap">${b.desc}</span>`]);
+  if(b.desc) infoRows.push(['소개',`<span style="color:var(--tx2);white-space:pre-wrap;text-align:left;display:block">${b.desc}</span>`]);
   if(b.addr) infoRows.push(['주소',b.addr]);
   if(b.hours) infoRows.push(['영업시간',b.hours]);
   if(b.phone) infoRows.push(['전화',`<a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a>`]);
@@ -730,7 +730,10 @@ function renderBizDetail(b, prefix){
   infoRows.push(['예약',b.reservation?'✅ 가능':'❌ 불가']);
   const infoEl = $(prefix+'-info');
   if(infoEl) infoEl.innerHTML=`<div class="h2" style="margin-top:24px">📋 매장 정보</div><div class="bizdetail">`+
-    infoRows.map(r=>`<div class="row"><span style="color:var(--tx3);flex-shrink:0">${r[0]}</span><b style="text-align:right;word-break:break-all">${r[1]}</b></div>`).join('')+`</div>`;
+    infoRows.map(r=>r[0]==='소개'
+      ? `<div class="row" style="flex-direction:column;align-items:flex-start;gap:6px"><span style="color:var(--tx3)">${r[0]}</span><div style="font-size:13px;color:var(--tx2);line-height:1.6;white-space:pre-wrap">${r[1].replace(/<[^>]*>/g,'')}</div></div>`
+      : `<div class="row"><span style="color:var(--tx3);flex-shrink:0">${r[0]}</span><b style="text-align:right;word-break:break-all">${r[1]}</b></div>`
+    ).join('')+`</div>`;
 
   // 메뉴판 사진
   const menuEl = $(prefix+'-menu');
