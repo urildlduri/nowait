@@ -317,8 +317,8 @@
         <div id="hotAreaFilter" style="display:flex;gap:10px;width:max-content"></div>
       </div>
       <!-- 카테고리 필터 -->
-      <div style="overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:4px 20px 10px">
-        <div id="hotCatFilter" style="display:flex;gap:6px;width:max-content"></div>
+      <div style="overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:4px 20px 12px">
+        <div id="hotCatFilter" style="display:flex;gap:8px;width:max-content"></div>
       </div>
       <div class="muted" style="margin:4px 0 14px"><span id="hotMore"></span></div>
       <div id="hotList"><div class="muted" style="font-size:13px">핫플을 불러오는 중…</div></div>
@@ -593,14 +593,19 @@ function buildHotAreaFilter(){
 
 function buildHotCatFilter(){
   const el=$('hotCatFilter'); if(!el) return;
-  el.innerHTML = `<button class="chip on" id="hcat-all" onclick="setHotCatFilter('all')">전체</button>`
-    + NW.CATS.map(c=>`<button class="chip" id="hcat-${c.k}" onclick="setHotCatFilter('${c.k}')">${c.e} ${c.n}</button>`).join('');
+  el.innerHTML = `<button style="padding:10px 16px;border-radius:20px;font-size:13px;font-weight:700;white-space:nowrap;border:1.5px solid var(--y);background:var(--y);color:#000;cursor:pointer" id="hcat-all" onclick="setHotCatFilter('all')">전체</button>`
+    + NW.CATS.map(c=>`<button style="padding:10px 16px;border-radius:20px;font-size:13px;font-weight:700;white-space:nowrap;border:1.5px solid var(--bd);background:transparent;color:var(--tx2);cursor:pointer" id="hcat-${c.k}" onclick="setHotCatFilter('${c.k}')">${c.e} ${c.n}</button>`).join('');
 }
 
 let _hotCatFilter='all';
 window.setHotCatFilter=(cat)=>{
   _hotCatFilter=cat;
-  document.querySelectorAll('[id^="hcat-"]').forEach(b=>b.classList.toggle('on',b.id==='hcat-'+cat));
+  document.querySelectorAll('[id^="hcat-"]').forEach(b=>{
+    const on = b.id==='hcat-'+cat;
+    b.style.background = on?'var(--y)':'transparent';
+    b.style.color = on?'#000':'var(--tx2)';
+    b.style.borderColor = on?'var(--y)':'var(--bd)';
+  });
   applyHotFilters();
 };
 
