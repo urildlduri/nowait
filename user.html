@@ -146,12 +146,17 @@
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:16px">
         <div><div class="h1" id="d-name" style="font-size:22px">매장</div>
           <div class="muted mono" id="d-meta" style="margin-top:6px">--</div></div>
-        <div id="d-badge"></div>
+        <div id="d-rating"></div>
       </div>
+      <div id="d-badge" style="margin-top:6px"></div>
       <div id="d-map" style="width:100%;height:200px;border-radius:var(--rad);margin-top:18px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
       <a id="d-route" class="cta ghost" style="margin-top:10px;display:block;text-align:center" target="_blank" rel="noopener">🧭 카카오맵 길찾기</a>
-      <div id="d-menu"></div>
       <div id="d-info"></div>
+      <div id="d-menu"></div>
+      <div class="sec-divider"></div>
+      <div class="h2">리뷰</div>
+      <div id="d-myreview"></div>
+      <div id="d-reviews"><div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div></div>
     </div>
     <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(14,14,16,.96);backdrop-filter:blur(12px);border-top:1px solid var(--bd);padding:14px 20px calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:60">
       <button class="cta ghost" style="margin:0;flex:1" onclick="closeDetail()">뒤로</button>
@@ -1213,14 +1218,16 @@ window.openDetail=async(respId)=>{
 
   subShow('u-detail');
   renderBizDetail(b, 'd');
-  // 호출 상태 뱃지 (d-detail 전용)
+  // 호출 상태 뱃지
   $('d-badge').innerHTML = r.type==='ok'?'<span class="badge bd-ok">지금 가능</span>':'<span class="badge bd-soon">10분 후</span>';
-  // 길찾기 (renderBizDetail에서 처리되지만 dist 포함 meta 재설정)
+  // 길찾기 + meta
   $('d-meta').textContent=`${catOf(r.cat||sel.cats[0]).e} ${catOf(r.cat||sel.cats[0]).n} · ${distLabel(r.dist)}`;
   if(b.lat&&b.lng){ $('d-route').href=NW.kakaoRoute(r.bizName,b.lat,b.lng); $('d-route').classList.remove('hide'); }
   else $('d-route').classList.add('hide');
   // 지도
   drawMap(b);
+  // 리뷰 (핫플과 동일)
+  loadDetailReviews(r.id, b);
 };
 function photoFallback(c){return `<div style="width:100%;aspect-ratio:4/3;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:64px">${c.e}</div>`;}
 
@@ -1231,6 +1238,84 @@ window.openMenuPhoto=(url)=>{
   overlay.onclick=()=>overlay.remove();
   document.body.appendChild(overlay);
 };
+async function loadDetailReviews(bizId, b){
+  if(!NW.fbLoaded) await NW.fbReady;
+  const {collection,query,where,getDocs,orderBy}=NW.fb;
+  let snap;
+  try{ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId),orderBy('at','desc'))); }
+  catch(e){ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId))); }
+  const list=snap.docs.map(d=>({id:d.id,...d.data()}));
+  let canReview=false, myReview=null;
+  if(NW.uid){
+    canReview=await checkArrivedAt(bizId);
+    myReview=list.find(r=>r.uid===NW.uid);
+  }
+  // 내 리뷰
+  if(myReview){
+    $('d-myreview').innerHTML=`<div class="statbox" style="margin-top:0">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div><b style="color:var(--y)">내 리뷰 ${'⭐'.repeat(myReview.rating)}</b>
+          <div class="muted" style="margin-top:4px;font-size:13px">${myReview.text||''}</div></div>
+        <button class="adm-btn danger" style="padding:5px 9px;font-size:11px" onclick="deleteDetailReview('${myReview.id}','${bizId}')">삭제</button>
+      </div></div>`;
+  }else if(canReview){
+    $('d-myreview').innerHTML=`<div class="statbox" style="margin-top:0">
+      <div class="field-lb" style="margin-bottom:8px">방문 후기를 남겨주세요</div>
+      <div id="drvStars" style="display:flex;gap:6px;font-size:30px;margin-bottom:10px;user-select:none">
+        ${[1,2,3,4,5].map(n=>`<span data-n="${n}" onclick="pickDStar(${n})" style="cursor:pointer;color:var(--tx3)">★</span>`).join('')}
+      </div>
+      <textarea class="inp" id="drvText" rows="2" placeholder="음식·분위기·서비스 등 자유롭게"></textarea>
+      <button class="cta" style="margin-top:10px" onclick="submitDetailReview('${bizId}')">리뷰 등록</button>
+    </div>`;
+  }else{
+    $('d-myreview').innerHTML=`<div class="muted" style="font-size:12px;margin-bottom:14px">방문 후 도착완료한 매장만 리뷰를 작성할 수 있어요.</div>`;
+  }
+  // 리뷰 목록
+  const others=list.filter(r=>r.uid!==NW.uid);
+  $('d-reviews').innerHTML=others.length ? others.map(r=>{
+    const t=r.at?.toDate?r.at.toDate():null;
+    const ts=t?`${t.getMonth()+1}/${t.getDate()}`:'';
+    return `<div class="bizdetail" style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+        <b style="color:var(--y)">${'⭐'.repeat(r.rating||0)}</b>
+        <span style="color:var(--tx3);font-size:11px">${r.userName||''} · ${ts}</span>
+      </div>
+      <div style="color:var(--tx2);font-size:13px">${(r.text||'').replace(/</g,'&lt;')}</div></div>`;
+  }).join('') : `<div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div>`;
+}
+
+let drvRating=0;
+window.pickDStar=n=>{
+  drvRating=n;
+  document.querySelectorAll('#drvStars span').forEach(s=>{s.style.color=(+s.dataset.n<=n)?'var(--y)':'var(--tx3)';});
+};
+window.submitDetailReview=async(bizId)=>{
+  if(!drvRating){toast('별점을 선택해 주세요');return;}
+  const text=$('drvText')?.value.trim()||'';
+  const {doc,setDoc,serverTimestamp}=NW.fb;
+  try{
+    await setDoc(doc(NW.db,'nw_reviews',`${bizId}_${NW.uid}`),{
+      bizId, bizName:detailBiz?.name||'', uid:NW.uid,
+      userName:NW.user?.displayName||'', rating:drvRating, text, at:serverTimestamp()
+    });
+    await updateBizRating(bizId);
+    toast('리뷰 등록 완료!');
+    await awardPoints(50,'리뷰 작성');
+    drvRating=0;
+    loadDetailReviews(bizId, detailBiz);
+  }catch(e){toast('실패: '+e.message);}
+};
+window.deleteDetailReview=async(reviewId,bizId)=>{
+  if(!confirm('리뷰를 삭제할까요?'))return;
+  const {doc,deleteDoc}=NW.fb;
+  try{
+    await deleteDoc(doc(NW.db,'nw_reviews',reviewId));
+    await updateBizRating(bizId);
+    toast('삭제 완료');
+    loadDetailReviews(bizId, detailBiz);
+  }catch(e){toast('실패: '+e.message);}
+};
+
 async function drawMap(b){
   const box=$('d-map');
   if(!b.lat||!b.lng){box.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:13px">위치 정보 없음</div>';return;}
