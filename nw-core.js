@@ -298,7 +298,7 @@ NW.adminCreateMerchant = async function({name, cat, addr, lat, lng}){
   const rand = Math.floor(100+Math.random()*900);
   const merchantId = `${prefix}-${rand}`;
   // 비밀번호 고정 1234 (현장 전달 쉽게)
-  const password = '1234';
+  const password = '123456';
   const fakeEmail = NW.merchantIdToFakeEmail(merchantId);
 
   // 2) 보조 앱 인스턴스에서 계정 생성 (관리자 세션 영향 없음)
@@ -461,4 +461,3 @@ NW.myBusiness = async function(){
   if(!list.length) return null;
   return list.find(b=>b.approved)||list[0];
 };
-
