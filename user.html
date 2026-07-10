@@ -61,7 +61,22 @@
           <div style="position:relative">
             <div style="font-size:11px;font-weight:600;letter-spacing:.5px;opacity:.85;margin-bottom:4px">FAST MATCH ⚡</div>
             <div style="font-size:19px;font-weight:700;line-height:1.4;margin-bottom:2px">지금 갈 수 있는 곳을<br>바로 찾아드려요</div>
-            <div style="font-size:12px;opacity:.85">호출 한 번이면 주변 매장이 응답해요</div>
+            <div style="font-size:12px;opacity:.85;margin-bottom:12px">호출 한 번이면 주변 매장이 응답해요</div>
+            <!-- 실시간 통계 -->
+            <div id="heroStats" style="display:none;background:rgba(0,0,0,0.15);border-radius:10px;padding:10px 14px;display:flex;gap:0">
+              <div style="flex:1;text-align:center;border-right:1px solid rgba(255,255,255,0.2)">
+                <div style="font-size:20px;font-weight:800" id="statOpen">-</div>
+                <div style="font-size:10px;opacity:.8;margin-top:2px">영업중</div>
+              </div>
+              <div style="flex:1;text-align:center;border-right:1px solid rgba(255,255,255,0.2)">
+                <div style="font-size:20px;font-weight:800" id="statAvail">-</div>
+                <div style="font-size:10px;opacity:.8;margin-top:2px">즉시 입장</div>
+              </div>
+              <div style="flex:1;text-align:center">
+                <div style="font-size:20px;font-weight:800" id="statArea">-</div>
+                <div style="font-size:10px;opacity:.8;margin-top:2px" id="statAreaLb">내 주변</div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -420,6 +435,7 @@ function init(){
     loadHotplaces();
     loadPoints();
     loadNotices();
+    loadHeroStats();
     setTimeout(()=>restoreActiveCall(), 1500);
   });
 }
@@ -1993,6 +2009,34 @@ window.postTogether=async()=>{
     loadTogether();
   }catch(e){ toast('실패: '+e.message); }
 };
+
+/* ── 히어로 실시간 통계 ── */
+async function loadHeroStats(){
+  if(!NW.fbLoaded) await NW.fbReady;
+  if(!NW.db) return;
+  try{
+    const {collection,getDocs,query,where}=NW.fb;
+    const snap = await getDocs(query(collection(NW.db,'nw_biz'),where('approved','==',true)));
+    const all = snap.docs.map(d=>d.data());
+
+    // 내 주변 매장 (위치 있으면 3km, 없으면 전체)
+    let nearby = all;
+    if(myLoc){
+      nearby = all.filter(b=>b.lat&&b.lng&&haversine(myLoc,{lat:b.lat,lng:b.lng})<=3000);
+    }
+    if(!nearby.length) return;
+
+    const open = nearby.filter(b=>b.status==='open').length;
+    const avail = nearby.filter(b=>b.status==='open'||b.status==='busy').length;
+    const areaName = myLoc ? '내 주변' : '전체';
+
+    $('statOpen').textContent = open+'개';
+    $('statAvail').textContent = avail+'개';
+    $('statArea').textContent = nearby.length+'곳';
+    $('statAreaLb').textContent = areaName;
+    $('heroStats').style.display='flex';
+  }catch(e){}
+}
 
 async function loadNotices(){
   try{
