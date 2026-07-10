@@ -660,7 +660,7 @@ function renderBizDetail(b, prefix){
     $(prefix+'-photo').innerHTML=`
       <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
         <div id="${sliderId}" style="display:flex;transition:transform .35s ease;will-change:transform">
-          ${photos.map(p=>`<div style="min-width:100%;aspect-ratio:4/3;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+          ${photos.map(p=>`<div style="min-width:100%;height:260px;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
         </div>
         ${photos.length>1?`
         <button onclick="slideBizPhoto('${prefix}',-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
