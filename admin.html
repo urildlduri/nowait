@@ -827,9 +827,7 @@ window.openBizEdit=async(bizId)=>{
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">전화번호</div>
           <input class="inp" id="bePhone" value="${b.phone||''}" placeholder="02-000-0000" style="margin:0"></div>
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">영업시간</div>
-          <textarea class="inp" id="beHours" rows="3" placeholder="예) 월-금 17:00-02:00
-토-일 15:00-02:00
-브레이크 16:00-17:00" style="margin:0;resize:vertical">${b.hours||''}</textarea></div>
+          <input class="inp" id="beHours" value="${b.hours||''}" placeholder="매일 17:00 – 02:00" style="margin:0"></div>
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">홈페이지 URL</div>
           <input class="inp" id="beWeb" value="${b.website||''}" placeholder="https://..." style="margin:0"></div>
         <div><div class="muted" style="font-size:12px;font-weight:700;margin-bottom:4px">소개글</div>

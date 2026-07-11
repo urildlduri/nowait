@@ -164,7 +164,6 @@ NW.fbReady = (async()=>{
       collection:F.collection, collectionGroup:F.collectionGroup, doc:F.doc, addDoc:F.addDoc, setDoc:F.setDoc, updateDoc:F.updateDoc,
       getDoc:F.getDoc, getDocs:F.getDocs, query:F.query, where:F.where, onSnapshot:F.onSnapshot,
       serverTimestamp:F.serverTimestamp, deleteDoc:F.deleteDoc, orderBy:F.orderBy, limit:F.limit, Timestamp:F.Timestamp, increment:F.increment,
-      runTransaction:F.runTransaction, writeBatch:F.writeBatch,
       getStorage:S.getStorage, storageRef:S.ref, uploadBytes:S.uploadBytes, getDownloadURL:S.getDownloadURL, deleteObject:S.deleteObject
     });
     if(NW.cfgOk){

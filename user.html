@@ -157,8 +157,21 @@
   <div id="u-detail" class="scr">
     <div class="page" style="padding-bottom:110px">
       <button class="back" onclick="closeDetail()" style="background:none;color:var(--tx2);font-weight:700;font-size:14px;margin-bottom:14px">← 뒤로</button>
-      <!-- renderBizDetail이 여기에 렌더 -->
       <div id="d-photo"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:16px">
+        <div><div class="h1" id="d-name" style="font-size:22px">매장</div>
+          <div class="muted mono" id="d-meta" style="margin-top:6px">--</div></div>
+        <div id="d-rating"></div>
+      </div>
+      <div id="d-badge" style="margin-top:6px"></div>
+      <div id="d-map" style="width:100%;height:200px;border-radius:var(--rad);margin-top:18px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
+      <a id="d-route" class="cta ghost" style="margin-top:10px;display:block;text-align:center" target="_blank" rel="noopener">🧭 카카오맵 길찾기</a>
+      <div id="d-info"></div>
+      <div id="d-menu"></div>
+      <div class="sec-divider"></div>
+      <div class="h2">리뷰</div>
+      <div id="d-myreview"></div>
+      <div id="d-reviews"><div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div></div>
     </div>
     <div style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(14,14,16,.96);backdrop-filter:blur(12px);border-top:1px solid var(--bd);padding:14px 20px calc(14px + env(safe-area-inset-bottom));display:flex;gap:10px;z-index:60">
       <button class="cta ghost" style="margin:0;flex:1" onclick="closeDetail()">뒤로</button>
@@ -314,11 +327,18 @@
 
   <!-- 핫플 매장 상세 -->
   <div id="u-hotdetail" class="scr">
-    <div class="page" style="padding-bottom:120px">
+    <div class="page" style="padding-bottom:100px">
       <button class="back" onclick="closeHotDetail()" style="background:none;color:var(--tx2);font-weight:700;font-size:14px;margin-bottom:14px">← 핫플 목록</button>
-      <!-- renderBizDetail이 여기에 렌더 -->
       <div id="hd-photo"></div>
-      <!-- 직접호출 섹션 -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:16px">
+        <div><div class="h1" id="hd-name" style="font-size:22px">매장</div>
+          <div class="muted mono" id="hd-meta" style="margin-top:6px">--</div></div>
+        <div id="hd-rating"></div>
+      </div>
+      <div id="hd-map" style="width:100%;height:200px;border-radius:var(--rad);margin-top:18px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
+      <a id="hd-route" class="cta ghost" style="margin-top:10px;display:block;text-align:center" target="_blank" rel="noopener">🧭 카카오맵 길찾기</a>
+
+      <!-- 핫플 1:1 호출 -->
       <div class="statbox" style="margin-top:16px;border:2px solid var(--y)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <b style="color:var(--y);font-size:15px">📞 이 매장에 직접 호출하기</b>
@@ -328,6 +348,13 @@
         <div class="chips" id="hdPartyChips"></div>
         <button class="cta" id="hdCallBtn" style="margin-top:10px" onclick="directCall()" disabled>지금 가능 한가요?</button>
       </div>
+
+      <div id="hd-info"></div>
+      <div id="hd-menu"></div>
+      <div class="sec-divider"></div>
+      <div class="h2">리뷰</div>
+      <div id="hd-myreview"></div>
+      <div id="hd-reviews"><div class="muted" style="font-size:13px">아직 리뷰가 없어요. 첫 리뷰를 남겨보세요.</div></div>
     </div>
   </div>
 
@@ -673,12 +700,13 @@ function showHotDetail(b){
   dcParty=null;
   subShow('u-hotdetail');
   renderBizDetail(b, 'hd');
-  // 직접호출 인원 칩 (렌더 후 DOM에 추가)
-  setTimeout(()=>{
-    if($('hdPartyChips')) $('hdPartyChips').innerHTML=NW.PARTY.map(n=>`<button class="chip" data-n="${n}" onclick="pickDcParty(${n})">${n}${n===6?'+':''}명</button>`).join('');
-    if($('hdCallBtn')) $('hdCallBtn').disabled=true;
-    drawHotMap(b);
-  }, 50);
+  // 지도
+  drawHotMap(b);
+  // 핫플 직접호출 인원 칩
+  $('hdPartyChips').innerHTML=NW.PARTY.map(n=>`<button class="chip" data-n="${n}" onclick="pickDcParty(${n})">${n}${n===6?'+':''}명</button>`).join('');
+  $('hdCallBtn').disabled=true;
+  // 리뷰
+  loadHotReviews(b.id);
 }
 window.pickDcParty=n=>{
   dcParty=n;
@@ -686,181 +714,80 @@ window.pickDcParty=n=>{
   $('hdCallBtn').disabled = !(dcParty && curHotBiz && myLoc && !penalActive());
 };
 /* ════════════════════════════════════════════════
-   공통 매장 상세 렌더 — 탭 구조
+   공통 매장 상세 렌더 함수
    prefix = 'hd' (핫플) or 'd' (호출상세)
    ════════════════════════════════════════════════ */
-const REVIEW_TAGS = {
-  pub:     ['🍺 술 종류 많아요','😊 분위기 좋아요','🎵 음악 좋아요','⚡ 응답 빨랐어요','🍖 안주 맛있어요'],
-  karaoke: ['🎤 음향 좋아요','🧹 청결해요','💰 가성비 좋아요','⚡ 응답 빨랐어요','🎵 최신곡 많아요'],
-  escape:  ['🧩 난이도 적절해요','🎭 스토리 좋아요','🧹 청결해요','⚡ 응답 빨랐어요','👥 친절해요'],
-  golf:    ['⛳ 시설 좋아요','🖥 화면 선명해요','🧹 청결해요','⚡ 응답 빨랐어요','💰 가성비 좋아요'],
-  party:   ['🎉 공간 넓어요','🎵 음향 좋아요','🧹 청결해요','⚡ 응답 빨랐어요','📸 인생샷 명소'],
-  stay:    ['🛏 침구 깨끗해요','🚿 욕실 청결해요','📍 위치 좋아요','⚡ 응답 빨랐어요','🌅 뷰 좋아요'],
-  massage: ['💆 실력 좋아요','🧹 청결해요','😊 친절해요','⚡ 응답 빨랐어요','💰 가성비 좋아요'],
-  board:   ['🎲 게임 종류 많아요','😊 친절해요','🧹 청결해요','⚡ 응답 빨랐어요','☕ 음료 맛있어요'],
-  pcroom:  ['🖥 PC 빠릿해요','🧹 청결해요','😊 조용해요','⚡ 응답 빨랐어요','💰 가성비 좋아요'],
-  default: ['😊 좋아요','🧹 청결해요','⚡ 응답 빨랐어요','💰 가성비 좋아요','👥 친절해요'],
-};
-
 function renderBizDetail(b, prefix){
   const cat = catOf(b.cat);
   const photos = b.photos&&b.photos.length ? b.photos : (b.photo ? [b.photo] : []);
-  const dist = myLoc&&b.lat&&b.lng ? ' · '+distLabel(haversine(myLoc,{lat:b.lat,lng:b.lng})) : '';
-  const ratingHtml = b.ratingAvg
-    ? `<span style="color:var(--y);font-size:14px">${'★'.repeat(Math.round(+b.ratingAvg))}${'☆'.repeat(5-Math.round(+b.ratingAvg))}</span> <b style="font-size:14px">${(+b.ratingAvg).toFixed(1)}</b> <span style="color:var(--tx3);font-size:12px">· ${b.ratingCount||0}개</span>`
-    : `<span style="color:var(--tx3);font-size:12px">아직 별점 없음</span>`;
+  const sliderId = prefix+'PhotoSlider';
+  const dotClass = prefix+'pdot';
 
-  // 사진 슬라이드 HTML
-  const photoHtml = photos.length ? `
-    <div style="position:relative;overflow:hidden;height:220px;background:#111">
-      <div id="${prefix}PhotoSlider" style="display:flex;transition:transform .35s ease;height:100%">
-        ${photos.map(p=>`<div style="min-width:100%;height:100%;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
-      </div>
-      <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 50%,rgba(0,0,0,0.5));pointer-events:none"></div>
-      ${photos.length>1?`
-      <button onclick="slideBizPhoto('${prefix}',-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
-      <button onclick="slideBizPhoto('${prefix}',1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">›</button>
-      <div style="position:absolute;bottom:10px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
-        ${photos.map((_,i)=>`<div class="${prefix}pdot" style="width:${i===0?'16':'5'}px;height:5px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.4)'};transition:.2s"></div>`).join('')}
-      </div>
-      <div style="position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,0.5);color:#fff;font-size:11px;padding:2px 8px;border-radius:12px">1/${photos.length}</div>`:''}
-    </div>` : `<div style="height:180px;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:72px">${cat.e}</div>`;
-
-  // 정보 탭 내용
-  const infoHtml = `
-    ${b.desc?`<div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd)">
-      <div style="font-size:16px;flex-shrink:0;margin-top:1px">📝</div>
-      <div><div style="font-size:11px;color:var(--tx3);margin-bottom:3px">소개</div>
-        <div style="font-size:13px;color:var(--tx2);line-height:1.6;white-space:pre-wrap">${b.desc}</div></div>
-    </div>`:''}
-    ${b.hours?`<div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd)">
-      <div style="font-size:16px;flex-shrink:0;margin-top:1px">🕐</div>
-      <div><div style="font-size:11px;color:var(--tx3);margin-bottom:3px">영업시간</div>
-        <div style="font-size:13px;color:var(--tx);line-height:1.7;white-space:pre-wrap">${b.hours}</div></div>
-    </div>`:''}
-    ${b.addr?`<div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd)">
-      <div style="font-size:16px;flex-shrink:0;margin-top:1px">📍</div>
-      <div><div style="font-size:11px;color:var(--tx3);margin-bottom:3px">주소</div>
-        <div style="font-size:13px;color:var(--tx)">${b.addr}</div></div>
-    </div>`:''}
-    ${b.phone?`<div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd)">
-      <div style="font-size:16px;flex-shrink:0;margin-top:1px">📞</div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:space-between">
-        <div><div style="font-size:11px;color:var(--tx3);margin-bottom:3px">전화</div>
-          <a href="tel:${b.phone}" style="font-size:13px;color:var(--y)">${b.phone}</a></div>
-        <a href="tel:${b.phone}" style="background:var(--yd);color:var(--y);font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px">전화하기</a>
-      </div>
-    </div>`:''}
-    ${b.website?`<div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--bd)">
-      <div style="font-size:16px;flex-shrink:0;margin-top:1px">🌐</div>
-      <div style="flex:1;display:flex;align-items:center;justify-content:space-between">
-        <div style="font-size:11px;color:var(--tx3)">홈페이지</div>
-        <a href="${b.website}" target="_blank" style="font-size:13px;color:var(--y);font-weight:700">바로가기 →</a>
-      </div>
-    </div>`:''}
-    <div style="display:flex;gap:12px;padding:12px 16px">
-      <div style="font-size:16px;flex-shrink:0;margin-top:1px">✨</div>
-      <div><div style="font-size:11px;color:var(--tx3);margin-bottom:6px">편의시설</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <span style="font-size:12px;background:var(--bg2);padding:4px 10px;border-radius:20px;color:var(--tx)">${b.parking?'✅':'❌'} 주차</span>
-          <span style="font-size:12px;background:var(--bg2);padding:4px 10px;border-radius:20px;color:var(--tx)">${b.reservation?'✅':'❌'} 예약</span>
+  // 사진 슬라이드
+  if(photos.length){
+    $(prefix+'-photo').innerHTML=`
+      <div style="position:relative;overflow:hidden;border-radius:var(--rad)">
+        <div id="${sliderId}" style="display:flex;transition:transform .35s ease;will-change:transform">
+          ${photos.map(p=>`<div style="min-width:100%;height:260px;flex-shrink:0;overflow:hidden"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
         </div>
-      </div>
-    </div>`;
+        ${photos.length>1?`
+        <button onclick="slideBizPhoto('${prefix}',-1)" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">‹</button>
+        <button onclick="slideBizPhoto('${prefix}',1)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.45);color:#fff;border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer">›</button>
+        <div style="position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
+          ${photos.map((_,i)=>`<div class="${dotClass}" style="width:${i===0?'16':'6'}px;height:6px;border-radius:3px;background:${i===0?'#fff':'rgba(255,255,255,0.5)'};transition:.2s"></div>`).join('')}
+        </div>`:''}
+      </div>`;
+    window[`_${prefix}PhotoCur`]=0; window[`_${prefix}PhotoTotal`]=photos.length;
+  }else{
+    $(prefix+'-photo').innerHTML=`<div style="width:100%;aspect-ratio:4/3;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:72px">${cat.e}</div>`;
+  }
 
-  // 사진 그리드 탭
-  const photoGridHtml = photos.length ? `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:3px;padding:12px 16px">
-      ${photos.map(p=>`<div style="aspect-ratio:1;border-radius:6px;overflow:hidden;cursor:pointer" onclick="openMenuPhoto('${p}')"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
-    </div>` : `<div style="padding:40px;text-align:center;color:var(--tx3);font-size:13px">등록된 사진이 없어요</div>`;
+  // 이름 / 메타
+  if($(prefix+'-name')) $(prefix+'-name').textContent=b.name||'매장';
+  const dist=myLoc&&b.lat&&b.lng?' · '+distLabel(haversine(myLoc,{lat:b.lat,lng:b.lng})):'';
+  if($(prefix+'-meta')) $(prefix+'-meta').textContent=`${cat.e} ${cat.n}${dist}`;
 
-  // 메뉴판 탭
-  const menuGridHtml = b.menuPhotos&&b.menuPhotos.length ? `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px">
-      ${b.menuPhotos.map(p=>`<div style="aspect-ratio:3/4;border-radius:8px;overflow:hidden;cursor:pointer" onclick="openMenuPhoto('${p}')"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
-    </div>` : `<div style="padding:40px;text-align:center;color:var(--tx3);font-size:13px">등록된 메뉴판이 없어요</div>`;
+  // 별점
+  if($(prefix+'-rating')){
+    $(prefix+'-rating').innerHTML = b.ratingAvg
+      ? `<div style="text-align:right"><div style="color:var(--y);font-size:18px;font-weight:800">⭐ ${(+b.ratingAvg).toFixed(1)}</div><div style="color:var(--tx3);font-size:11px">리뷰 ${b.ratingCount||0}개</div></div>`
+      : `<div style="color:var(--tx3);font-size:12px">아직 별점 없음</div>`;
+  }
 
-  // 리뷰 태그
-  const tags = REVIEW_TAGS[b.cat] || REVIEW_TAGS.default;
-  const reviewTagHtml = `
-    <div style="padding:14px 16px 0">
-      <div style="font-size:13px;font-weight:700;color:var(--tx);margin-bottom:8px">이런 점이 좋았어요</div>
-      ${tags.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border-radius:8px;padding:10px 12px;margin-bottom:6px;border:1px solid var(--bd)">
-        <span style="font-size:13px;color:var(--tx)">${t}</span>
-        <span style="font-size:12px;font-weight:700;color:var(--y)" id="rtag_${prefix}_${t.replace(/[^a-z0-9]/gi,'_')}">0</span>
-      </div>`).join('')}
-    </div>`;
+  // 길찾기
+  if($(prefix+'-route')){
+    if(b.lat&&b.lng){ $(prefix+'-route').href=NW.kakaoRoute(b.name,b.lat,b.lng); $(prefix+'-route').classList.remove('hide'); }
+    else $(prefix+'-route').classList.add('hide');
+  }
 
-  // 전체 HTML 조립
-  const el = $(prefix+'-photo');
-  if(!el) return;
-  const parent = el.parentNode;
+  // 영업정보 통합 (소개글+주소+연락처+영업시간+편의)
+  const infoRows=[];
+  if(b.desc) infoRows.push(['소개',`<span style="color:var(--tx2);white-space:pre-wrap;text-align:left;display:block">${b.desc}</span>`]);
+  if(b.addr) infoRows.push(['주소',b.addr]);
+  if(b.hours) infoRows.push(['영업시간',b.hours]);
+  if(b.phone) infoRows.push(['전화',`<a href="tel:${b.phone}" style="color:var(--y)">${b.phone}</a>`]);
+  if(b.website) infoRows.push(['홈페이지',`<a href="${b.website}" target="_blank" style="color:var(--y)">바로가기 →</a>`]);
+  infoRows.push(['주차',b.parking?'✅ 가능':'❌ 불가']);
+  infoRows.push(['예약',b.reservation?'✅ 가능':'❌ 불가']);
+  const infoEl = $(prefix+'-info');
+  if(infoEl) infoEl.innerHTML=`<div class="h2" style="margin-top:24px">📋 매장 정보</div><div class="bizdetail">`+
+    infoRows.map(r=>r[0]==='소개'
+      ? `<div class="row" style="flex-direction:column;align-items:flex-start;gap:6px"><span style="color:var(--tx3)">${r[0]}</span><div style="font-size:13px;color:var(--tx2);line-height:1.6;white-space:pre-wrap">${r[1].replace(/<[^>]*>/g,'')}</div></div>`
+      : `<div class="row"><span style="color:var(--tx3);flex-shrink:0">${r[0]}</span><b style="text-align:right;word-break:break-all">${r[1]}</b></div>`
+    ).join('')+`</div>`;
 
-  // photo div를 컨테이너로 활용해서 전체 렌더
-  parent.innerHTML = `
-    <!-- 사진 슬라이드 -->
-    ${photoHtml}
-
-    <!-- 매장명 + 별점 -->
-    <div style="padding:14px 16px 0">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:6px">
-        <div>
-          <div style="font-size:17px;font-weight:700;color:var(--tx);line-height:1.3" id="${prefix}-name">${b.name||'매장'}</div>
-          <div style="font-size:12px;color:var(--tx3);margin-top:3px" id="${prefix}-meta">${cat.e} ${cat.n}${dist}</div>
-        </div>
-        <div id="${prefix}-badge"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;padding-bottom:12px;border-bottom:1px solid var(--bd)">
-        ${ratingHtml}
-      </div>
-    </div>
-
-    <!-- 탭바 -->
-    <div style="display:flex;border-bottom:1px solid var(--bd);background:var(--bg2)" id="${prefix}-tabbar">
-      <div onclick="switchBizTab('${prefix}','info')" id="${prefix}-tab-info" style="flex:1;text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:var(--y);border-bottom:2px solid var(--y);cursor:pointer">📋<br>정보</div>
-      <div onclick="switchBizTab('${prefix}','photogrid')" id="${prefix}-tab-photogrid" style="flex:1;text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:var(--tx3);cursor:pointer">📷<br>사진</div>
-      <div onclick="switchBizTab('${prefix}','menu')" id="${prefix}-tab-menu" style="flex:1;text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:var(--tx3);cursor:pointer">🍽<br>메뉴판</div>
-      <div onclick="switchBizTab('${prefix}','review')" id="${prefix}-tab-review" style="flex:1;text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:var(--tx3);cursor:pointer">⭐<br>리뷰</div>
-    </div>
-
-    <!-- 정보 탭 -->
-    <div id="${prefix}-panel-info">${infoHtml}</div>
-
-    <!-- 사진 탭 -->
-    <div id="${prefix}-panel-photogrid" style="display:none">${photoGridHtml}</div>
-
-    <!-- 메뉴판 탭 -->
-    <div id="${prefix}-panel-menu" style="display:none">${menuGridHtml}</div>
-
-    <!-- 리뷰 탭 -->
-    <div id="${prefix}-panel-review" style="display:none">
-      ${reviewTagHtml}
-      <div style="border-top:1px solid var(--bd);margin-top:12px;padding:12px 16px" id="${prefix}-review-list">
-        <div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div>
-      </div>
-    </div>
-
-    <!-- 길찾기 -->
-    ${b.lat&&b.lng?`<a id="${prefix}-route" href="${NW.kakaoRoute?NW.kakaoRoute(b.name,b.lat,b.lng):'#'}" target="_blank" class="cta ghost" style="margin:12px 16px;display:block;text-align:center">🧭 카카오맵 길찾기</a>`:''}
-
-    <!-- 지도 -->
-    <div id="${prefix}-map" style="width:calc(100% - 32px);height:180px;border-radius:var(--rad);margin:0 16px 16px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
-  `;
-
-  window[`_${prefix}PhotoCur`]=0; window[`_${prefix}PhotoTotal`]=photos.length;
+  // 메뉴판 사진
+  const menuEl = $(prefix+'-menu');
+  if(menuEl){
+    const mp = b.menuPhotos;
+    if(mp&&mp.length){
+      menuEl.innerHTML=`<div class="h2" style="margin-top:24px">🍽 메뉴판</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px">
+          ${mp.map(p=>`<div style="border-radius:10px;overflow:hidden;aspect-ratio:3/4;cursor:pointer" onclick="openMenuPhoto('${p}')"><img src="${p}" style="width:100%;height:100%;object-fit:cover"></div>`).join('')}
+        </div>`;
+    }else menuEl.innerHTML='';
+  }
 }
-
-window.switchBizTab=(prefix, tab)=>{
-  ['info','photogrid','menu','review'].forEach(t=>{
-    const btn=$(`${prefix}-tab-${t}`);
-    const panel=$(`${prefix}-panel-${t}`);
-    const on = t===tab;
-    if(btn){ btn.style.color=on?'var(--y)':'var(--tx3)'; btn.style.borderBottom=on?'2px solid var(--y)':'none'; }
-    if(panel) panel.style.display=on?'block':'none';
-  });
-  // 리뷰 탭 열면 태그 카운트 로드
-  if(tab==='review') loadReviewTags(prefix);
-};
 
 window.slideBizPhoto=(prefix,dir)=>{
   const total = window[`_${prefix}PhotoTotal`]||1;
@@ -1048,44 +975,7 @@ async function cancelDirectDoc(status){
 }
 
 /* 리뷰 시스템 — 도착완료한 매장에만 작성 가능, 1매장 1리뷰 */
-async function loadReviewTags(prefix){
-  // 현재 biz ID 가져오기
-  const bizId = prefix==='hd' ? curHotBiz?.id : detailResp?.id;
-  if(!bizId) return;
-  try{
-    const {collection,getDocs,query,where}=NW.fb;
-    const snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId)));
-    const reviews=snap.docs.map(d=>d.data());
-    // 태그 카운트
-    const tagCounts={};
-    reviews.forEach(r=>{ (r.tags||[]).forEach(t=>{ tagCounts[t]=(tagCounts[t]||0)+1; }); });
-    Object.entries(tagCounts).forEach(([tag,cnt])=>{
-      const key=tag.replace(/[^a-z0-9]/gi,'_');
-      const el=document.getElementById(`rtag_${prefix}_${key}`);
-      if(el) el.textContent=cnt;
-    });
-    // 리뷰 목록
-    const listEl=$(`${prefix}-review-list`);
-    if(!listEl) return;
-    if(!reviews.length){ listEl.innerHTML=`<div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div>`; return; }
-    listEl.innerHTML=reviews.map(r=>{
-      const t=r.at?.toDate?r.at.toDate():null;
-      const ts=t?`${t.getMonth()+1}/${t.getDate()}`:'';
-      return `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bd)">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="color:var(--y);font-size:13px">${'★'.repeat(r.rating||0)}${'☆'.repeat(5-(r.rating||0))}</span>
-          <span style="font-size:11px;color:var(--tx3)">${r.userName||'익명'} · ${ts}</span>
-        </div>
-        ${r.tags&&r.tags.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${r.tags.map(t=>`<span style="font-size:11px;background:var(--yd);color:var(--y);padding:3px 8px;border-radius:12px">${t}</span>`).join('')}</div>`:''}
-        ${r.text?`<div style="font-size:13px;color:var(--tx2);line-height:1.5">${r.text}</div>`:''}
-      </div>`;
-    }).join('');
-  }catch(e){}
-}
-
 async function loadHotReviews(bizId){
-  // 핫플 리뷰 — switchBizTab에서 처리
-}
   if(!NW.fbLoaded) await NW.fbReady;
   const {collection,query,where,getDocs,orderBy}=NW.fb;
   // 1) 이 매장 리뷰 목록
@@ -1394,15 +1284,16 @@ window.openDetail=async(respId)=>{
 
   subShow('u-detail');
   renderBizDetail(b, 'd');
-  // 호출 뱃지 + meta (렌더 후)
-  setTimeout(()=>{
-    const badge=$('d-badge');
-    if(badge) badge.innerHTML = r.type==='ok'?'<span class="badge bd-ok">지금 가능</span>':'<span class="badge bd-soon">10분 후</span>';
-    const meta=$('d-meta');
-    if(meta) meta.textContent=`${catOf(r.cat||sel.cats[0]).e} ${catOf(r.cat||sel.cats[0]).n} · ${distLabel(r.dist)}`;
-    drawMap(b);
-    loadDetailReviews(r.id, b);
-  }, 50);
+  // 호출 상태 뱃지
+  $('d-badge').innerHTML = r.type==='ok'?'<span class="badge bd-ok">지금 가능</span>':'<span class="badge bd-soon">10분 후</span>';
+  // 길찾기 + meta
+  $('d-meta').textContent=`${catOf(r.cat||sel.cats[0]).e} ${catOf(r.cat||sel.cats[0]).n} · ${distLabel(r.dist)}`;
+  if(b.lat&&b.lng){ $('d-route').href=NW.kakaoRoute(r.bizName,b.lat,b.lng); $('d-route').classList.remove('hide'); }
+  else $('d-route').classList.add('hide');
+  // 지도
+  drawMap(b);
+  // 리뷰 (핫플과 동일)
+  loadDetailReviews(r.id, b);
 };
 function photoFallback(c){return `<div style="width:100%;aspect-ratio:4/3;border-radius:var(--rad);background:var(--bg2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:64px">${c.e}</div>`;}
 
@@ -1415,54 +1306,48 @@ window.openMenuPhoto=(url)=>{
 };
 async function loadDetailReviews(bizId, b){
   if(!NW.fbLoaded) await NW.fbReady;
-  const {collection,query,where,getDocs}=NW.fb;
+  const {collection,query,where,getDocs,orderBy}=NW.fb;
   let snap;
-  try{ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId))); }
-  catch(e){ return; }
+  try{ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId),orderBy('at','desc'))); }
+  catch(e){ snap=await getDocs(query(collection(NW.db,'nw_reviews'),where('bizId','==',bizId))); }
   const list=snap.docs.map(d=>({id:d.id,...d.data()}));
-  // 리뷰 탭 패널에 리뷰 작성 폼 + 목록 주입
-  const prefix='d';
-  const tags = REVIEW_TAGS[b?.cat||'default'] || REVIEW_TAGS.default;
-  const canReview = await checkArrivedAt(bizId).catch(()=>false);
-  const myReview = list.find(r=>r.uid===NW.uid);
-  const listEl=$(`${prefix}-review-list`);
-  if(!listEl) return;
-
-  let writeHtml='';
+  let canReview=false, myReview=null;
+  if(NW.uid){
+    canReview=await checkArrivedAt(bizId);
+    myReview=list.find(r=>r.uid===NW.uid);
+  }
+  // 내 리뷰
   if(myReview){
-    writeHtml=`<div class="statbox" style="margin-top:0;margin-bottom:14px">
+    $('d-myreview').innerHTML=`<div class="statbox" style="margin-top:0">
       <div style="display:flex;justify-content:space-between;align-items:start">
         <div><b style="color:var(--y)">내 리뷰 ${'⭐'.repeat(myReview.rating)}</b>
           <div class="muted" style="margin-top:4px;font-size:13px">${myReview.text||''}</div></div>
         <button class="adm-btn danger" style="padding:5px 9px;font-size:11px" onclick="deleteDetailReview('${myReview.id}','${bizId}')">삭제</button>
       </div></div>`;
   }else if(canReview){
-    writeHtml=`<div class="statbox" style="margin-top:0;margin-bottom:14px">
+    $('d-myreview').innerHTML=`<div class="statbox" style="margin-top:0">
       <div class="field-lb" style="margin-bottom:8px">방문 후기를 남겨주세요</div>
-      <div id="drvStars" style="display:flex;gap:6px;font-size:28px;margin-bottom:10px">
+      <div id="drvStars" style="display:flex;gap:6px;font-size:30px;margin-bottom:10px;user-select:none">
         ${[1,2,3,4,5].map(n=>`<span data-n="${n}" onclick="pickDStar(${n})" style="cursor:pointer;color:var(--tx3)">★</span>`).join('')}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-        ${tags.map(t=>`<button class="rtag-btn chip" data-tag="${t}" onclick="this.classList.toggle('on')" style="font-size:12px">${t}</button>`).join('')}
-      </div>
-      <textarea class="inp" id="drvText" rows="2" placeholder="자유롭게 후기를 남겨주세요"></textarea>
+      <textarea class="inp" id="drvText" rows="2" placeholder="음식·분위기·서비스 등 자유롭게"></textarea>
       <button class="cta" style="margin-top:10px" onclick="submitDetailReview('${bizId}')">리뷰 등록</button>
     </div>`;
+  }else{
+    $('d-myreview').innerHTML=`<div class="muted" style="font-size:12px;margin-bottom:14px">방문 후 도착완료한 매장만 리뷰를 작성할 수 있어요.</div>`;
   }
-
+  // 리뷰 목록
   const others=list.filter(r=>r.uid!==NW.uid);
-  listEl.innerHTML=writeHtml+(others.length ? others.map(r=>{
+  $('d-reviews').innerHTML=others.length ? others.map(r=>{
     const t=r.at?.toDate?r.at.toDate():null;
     const ts=t?`${t.getMonth()+1}/${t.getDate()}`:'';
-    return `<div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--bd)">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-        <span style="color:var(--y);font-size:13px">${'★'.repeat(r.rating||0)}${'☆'.repeat(5-(r.rating||0))}</span>
-        <span style="font-size:11px;color:var(--tx3)">${r.userName||'익명'} · ${ts}</span>
+    return `<div class="bizdetail" style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
+        <b style="color:var(--y)">${'⭐'.repeat(r.rating||0)}</b>
+        <span style="color:var(--tx3);font-size:11px">${r.userName||''} · ${ts}</span>
       </div>
-      ${r.tags&&r.tags.length?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${r.tags.map(t=>`<span style="font-size:11px;background:var(--yd);color:var(--y);padding:3px 8px;border-radius:12px">${t}</span>`).join('')}</div>`:''}
-      ${r.text?`<div style="font-size:13px;color:var(--tx2);line-height:1.5">${r.text}</div>`:''}
-    </div>`;
-  }).join('') : `<div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div>`);
+      <div style="color:var(--tx2);font-size:13px">${(r.text||'').replace(/</g,'&lt;')}</div></div>`;
+  }).join('') : `<div class="muted" style="font-size:13px">아직 리뷰가 없어요.</div>`;
 }
 
 let drvRating=0;
@@ -1472,16 +1357,12 @@ window.pickDStar=n=>{
 };
 window.submitDetailReview=async(bizId)=>{
   if(!drvRating){toast('별점을 선택해 주세요');return;}
-  // 선택된 태그 수집
-  const selectedTags=[];
-  document.querySelectorAll('.rtag-btn.on').forEach(b=>selectedTags.push(b.dataset.tag));
   const text=$('drvText')?.value.trim()||'';
   const {doc,setDoc,serverTimestamp}=NW.fb;
   try{
     await setDoc(doc(NW.db,'nw_reviews',`${bizId}_${NW.uid}`),{
       bizId, bizName:detailBiz?.name||'', uid:NW.uid,
-      userName:NW.user?.displayName||'', rating:drvRating,
-      tags:selectedTags, text, at:serverTimestamp()
+      userName:NW.user?.displayName||'', rating:drvRating, text, at:serverTimestamp()
     });
     await updateBizRating(bizId);
     toast('리뷰 등록 완료!');
@@ -1864,8 +1745,7 @@ async function renderPartner(){
       <div id="pAddr" class="muted" style="font-size:12px;margin-top:6px"></div>
     </div>
     <div class="field"><div class="field-lb">전화번호</div><input class="inp" id="pPhone" placeholder="02-000-0000"></div>
-    <div class="field"><div class="field-lb">영업시간</div><textarea class="inp" id="pHours" rows="3" placeholder="예) 월-금 17:00-02:00
-토-일 15:00-02:00" style="resize:vertical"></textarea></div>
+    <div class="field"><div class="field-lb">영업시간</div><input class="inp" id="pHours" placeholder="매일 17:00 – 02:00"></div>
     <div class="field"><div class="field-lb">홈페이지 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div><input class="inp" id="pWebsite" placeholder="https://..."></div>
     <div class="field"><div class="field-lb">소개글 <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
       <textarea class="inp" id="pDesc" rows="3" placeholder="매장 소개를 입력해주세요" style="resize:vertical"></textarea></div>
@@ -2275,19 +2155,12 @@ window.downloadMyData=async()=>{
 
 window.clearMyHistory=async()=>{
   if(!confirm('호출 기록을 모두 삭제할까요?\n(계정은 유지됩니다. 되돌릴 수 없어요.)'))return;
-  const {collection,getDocs,writeBatch,doc}=NW.fb;
+  const {collection,getDocs,deleteDoc,doc}=NW.fb;
   try{
     const snap=await getDocs(collection(NW.db,'nw_users',NW.uid,'history'));
-    if(!snap.docs.length){ toast('삭제할 기록이 없어요'); return; }
-    // 500개 단위 배치 처리
-    let batch=writeBatch(NW.db), count=0, total=0;
-    for(const d of snap.docs){
-      batch.delete(doc(NW.db,'nw_users',NW.uid,'history',d.id));
-      count++; total++;
-      if(count===500){ await batch.commit(); batch=writeBatch(NW.db); count=0; }
-    }
-    if(count>0) await batch.commit();
-    toast(`호출 기록 ${total}건 삭제 완료`);
+    let n=0;
+    for(const d of snap.docs){ await deleteDoc(doc(NW.db,'nw_users',NW.uid,'history',d.id)); n++; }
+    toast(`호출 기록 ${n}건 삭제 완료`);
     renderMy();
   }catch(e){toast('삭제 실패: '+e.message);}
 };
@@ -2295,7 +2168,7 @@ window.clearMyHistory=async()=>{
 window.deleteAccount=async()=>{
   if(!confirm('정말 회원 탈퇴할까요?\n\n• 프로필, 호출 기록, 패널티 정보가 모두 영구 삭제됩니다\n• 진행 중인 호출이 있으면 자동 취소됩니다\n• 되돌릴 수 없습니다\n\n계속하려면 확인을 누르세요.'))return;
   if(!confirm('마지막 확인 — 정말로 모든 데이터를 삭제하시겠어요?'))return;
-  const {doc,getDocs,collection,query,where,updateDoc,writeBatch}=NW.fb;
+  const {doc,deleteDoc,getDocs,collection,query,where,updateDoc}=NW.fb;
   toast('데이터를 삭제하는 중…');
   try{
     // 1) 진행 중인 호출 취소
@@ -2306,24 +2179,16 @@ window.deleteAccount=async()=>{
         await updateDoc(d.ref,{status:'cancelled'}).catch(()=>{});
       }
     }
-    // 2) history 서브컬렉션 배치 삭제
+    // 2) history 서브컬렉션 삭제
     const hist=await getDocs(collection(NW.db,'nw_users',NW.uid,'history'));
-    if(hist.docs.length){
-      let batch=writeBatch(NW.db), count=0;
-      for(const d of hist.docs){
-        batch.delete(d.ref); count++;
-        if(count===500){ await batch.commit(); batch=writeBatch(NW.db); count=0; }
-      }
-      if(count>0) await batch.commit();
-    }
+    for(const d of hist.docs){ await deleteDoc(d.ref).catch(()=>{}); }
     // 3) 프로필 문서 삭제
-    const batch2=writeBatch(NW.db);
-    batch2.delete(doc(NW.db,'nw_users',NW.uid));
-    await batch2.commit();
-    // 4) Firebase Auth 계정 삭제
+    await deleteDoc(doc(NW.db,'nw_users',NW.uid)).catch(()=>{});
+    // 4) Firebase Auth 계정 삭제 시도 (재인증 필요할 수 있음)
     try{
       if(NW.user && NW.user.delete) await NW.user.delete();
     }catch(authErr){
+      // 재인증 필요 — 로그아웃 후 안내
       console.warn('auth delete needs re-auth',authErr);
     }
     toast('회원 탈퇴 완료. 안녕히 가세요.');
