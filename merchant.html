@@ -131,7 +131,8 @@
     <div class="field"><div class="field-lb">홈페이지 URL <span style="color:var(--tx3);font-weight:500">(선택)</span></div>
       <input class="inp" id="eWebsite" placeholder="https://..."></div>
     <div class="field"><div class="field-lb">영업시간 / 전화</div>
-      <input class="inp" id="eHours" placeholder="매일 17:00 – 02:00" style="margin-bottom:8px">
+      <textarea class="inp" id="eHours" rows="3" placeholder="예) 월-금 17:00-02:00
+토-일 15:00-02:00" style="margin-bottom:8px;resize:vertical"></textarea>
       <input class="inp" id="ePhone" placeholder="02-000-0000"></div>
     <div class="field"><div class="field-lb">최소 인원</div>
       <div class="chips" id="eMinPartyChips"></div></div>
@@ -811,7 +812,7 @@ function startCallTimer(id,exp){if(callTimers[id])return;
   callTimers[id]=setInterval(()=>{const el=$('ct-'+id);if(!el){clearInterval(callTimers[id]);delete callTimers[id];return;}
     const left=(exp-nowMs())/1000;el.textContent='⏱ '+fmtT(left)+' 남음';if(left<=0){clearInterval(callTimers[id]);delete callTimers[id];}},500);}
 window.respond=async(callId,type)=>{
-  const {doc,getDoc,setDoc,updateDoc,onSnapshot,serverTimestamp,Timestamp}=NW.fb;
+  const {doc,getDoc,setDoc,updateDoc,runTransaction,onSnapshot,serverTimestamp,Timestamp}=NW.fb;
   const cs=await getDoc(doc(NW.db,'nw_calls',callId));
   if(!cs.exists()||cs.data().status!=='searching'){toast('이미 마감된 호출이에요.');return;}
   const cd=cs.data();const realDist=haversine(myBiz,{lat:cd.lat,lng:cd.lng});
@@ -821,14 +822,25 @@ window.respond=async(callId,type)=>{
     at:serverTimestamp()});
   respondedCalls.add(callId);
   if(type!=='no'){stats.resp++;$('tsResp').textContent=stats.resp;}
-  // 핫플 직접호출(directBizId 있음) + '가능' 응답이면 'accepted' 상태로 (사용자 '갈게요' 대기)
+  // 핫플 직접호출 + '가능' 응답 — runTransaction으로 동시성 제어
   if(type==='ok' && cd.directBizId===myBizId){
-    const goingDeadline=Timestamp.fromMillis(nowMs()+30*1000);
-    await updateDoc(doc(NW.db,'nw_calls',callId),{
-      status:'accepted', matchedBizId:myBizId, matchedBizName:myBiz.name,
-      acceptedAt:serverTimestamp(), goingDeadline
-    }).catch(()=>{});
-    toast('🎉 직접호출 수락 — 손님이 30초 안에 「갈게요」를 누르면 예약 확정');
+    try{
+      await runTransaction(NW.db, async(tx)=>{
+        const callRef=doc(NW.db,'nw_calls',callId);
+        const fresh=await tx.get(callRef);
+        if(!fresh.exists()) throw new Error('호출이 존재하지 않아요');
+        if(fresh.data().status!=='searching') throw new Error('이미 마감된 호출이에요');
+        const goingDeadline=Timestamp.fromMillis(nowMs()+30*1000);
+        tx.update(callRef,{
+          status:'accepted', matchedBizId:myBizId, matchedBizName:myBiz.name,
+          acceptedAt:serverTimestamp(), goingDeadline
+        });
+      });
+      toast('🎉 직접호출 수락 — 손님이 30초 안에 「갈게요」를 누르면 예약 확정');
+    }catch(e){
+      toast(e.message||'수락 실패 — 다시 시도해주세요');
+      return;
+    }
   }else{
     toast(type==='ok'?'「가능」 응답 전송':type==='soon'?'「10분 후」 응답 전송':'「불가」 응답');
   }
