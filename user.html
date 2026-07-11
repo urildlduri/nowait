@@ -791,13 +791,17 @@ function renderBizDetail(b, prefix){
       </div>`).join('')}
     </div>`;
 
-  // 전체 HTML 조립
+  // 전체 HTML 조립 — hd-photo/d-photo 자체를 교체 (부모 보존)
   const el = $(prefix+'-photo');
   if(!el) return;
-  const parent = el.parentNode;
 
-  // photo div를 컨테이너로 활용해서 전체 렌더
-  parent.innerHTML = `
+  // 이전 detail-wrap 제거
+  const oldWrap = document.getElementById(prefix+'-detail-wrap');
+  if(oldWrap) oldWrap.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = prefix+'-detail-wrap';
+  wrap.innerHTML = `
     <!-- 사진 슬라이드 -->
     ${photoHtml}
 
@@ -846,6 +850,10 @@ function renderBizDetail(b, prefix){
     <!-- 지도 -->
     <div id="${prefix}-map" style="width:calc(100% - 32px);height:180px;border-radius:var(--rad);margin:0 16px 16px;background:var(--bg2);border:1px solid var(--bd);overflow:hidden"></div>
   `;
+
+  // hd-photo 앞에 삽입 (직접호출 섹션 보존)
+  el.parentNode.insertBefore(wrap, el);
+  el.remove();
 
   window[`_${prefix}PhotoCur`]=0; window[`_${prefix}PhotoTotal`]=photos.length;
 }
