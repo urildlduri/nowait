@@ -1,18 +1,18 @@
 /* ============================================================
-   OHDIGA 공통 스타일  ·  화이트 + 레드 톤
+   OHDIGA 공통 스타일  ·  바이브 핑크 테마
    ============================================================ */
 :root{
-  /* 메인 컬러 = 레드 (CTA, 활성 칩, 강조) */
-  --y:#EF4444; --y2:#DC2626; --yd:#FEE2E2;
-  /* 배경 — 화이트 톤 */
-  --bg:#F7F8FA; --bg2:#FFFFFF; --bg3:#F3F4F6; --bd:#E5E7EB;
-  /* 텍스트 — 어두운 그레이 */
-  --tx:#111827; --tx2:#6B7280; --tx3:#9CA3AF;
+  /* 메인 컬러 = 핑크 (CTA, 활성 칩, 강조) */
+  --y:#FF3366; --y2:#E8005A; --yd:#fff0f5;
+  /* 배경 — 핑크 화이트 톤 */
+  --bg:#FFF5F8; --bg2:#FFFFFF; --bg3:#FFE8F0; --bd:#FFD0E0;
+  /* 텍스트 */
+  --tx:#1a0010; --tx2:#6B2040; --tx3:#B06080;
   /* 상태 */
   --ok:#059669; --okbg:#D1FAE5;
-  --soon:#D97706; --soonbg:#FEF3C7;
+  --soon:#FF6B9D; --soonbg:#fff0f5;
   --no:#DC2626; --nobg:#FEE2E2;
-  --info:#EF4444; --infobg:#FEE2E2;
+  --info:#FF3366; --infobg:#fff0f5;
   --rad:12px; --radL:18px; --mono:'JetBrains Mono',monospace;
   --logo:'Inter',sans-serif;
 }

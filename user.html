@@ -41,7 +41,7 @@
     <div class="page" style="padding:0 0 24px">
 
       <!-- 공지 배너 (카테고리 위) -->
-      <div id="noticeBanner" class="hide" style="background:#0A0A0A;border-bottom:2px solid #1a1a1a;height:44px;overflow:hidden">
+      <div id="noticeBanner" class="hide" style="background:#1a0010;border-bottom:2px solid #FF336620;height:44px;overflow:hidden">
         <div id="noticeSlides" style="display:flex;flex-direction:column;transition:transform .5s cubic-bezier(.4,0,.2,1)"></div>
         <div id="noticeDots"></div>
       </div>
@@ -55,7 +55,7 @@
       <div style="padding:20px 20px 8px">
 
         
-        <div style="background:var(--y);border-radius:var(--radL);padding:20px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#FF3366,#FF6B9D);border-radius:var(--radL);padding:20px;color:#fff;margin-bottom:14px;position:relative;overflow:hidden">
           <div style="position:absolute;right:-30px;top:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.08)"></div>
           <div style="position:absolute;right:16px;bottom:-12px;font-size:60px;opacity:.18">⚡</div>
           <div style="position:relative">
@@ -2181,10 +2181,10 @@ function renderNoticeBanner(notices){
 
   slides.innerHTML = notices.map((n,i)=>`
     <div onclick="uGo('u-info','n-info');loadInfoTab();switchInfoTab('notice')" style="min-width:100%;padding:0 16px;box-sizing:border-box;display:flex;align-items:center;gap:10px;height:44px;cursor:pointer">
-      <span style="color:#00BFFF;font-size:11px;font-weight:800;font-family:monospace;flex-shrink:0;letter-spacing:1px">📢</span>
-      <div style="width:1px;height:20px;background:#333;flex-shrink:0"></div>
+      <span style="color:#FF3366;font-size:11px;font-weight:800;font-family:monospace;flex-shrink:0;letter-spacing:1px">📢</span>
+      <div style="width:1px;height:20px;background:#FF336640;flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:700;color:#00BFFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:monospace;letter-spacing:0.3px">
+        <div style="font-size:13px;font-weight:700;color:#FF85A5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:monospace;letter-spacing:0.3px">
           ${n.title||n.body||'공지사항'}
         </div>
       </div>
